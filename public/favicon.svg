@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ArtPillPlan">
+  <rect width="512" height="512" rx="96" fill="#fff3d4"/>
+  <rect x="58" y="58" width="396" height="396" rx="82" fill="#b82d24"/>
+  <path d="M171 342c-39-39-39-103 0-142l38-38c39-39 103-39 142 0s39 103 0 142l-38 38c-39 39-103 39-142 0z" fill="#fff6dd"/>
+  <path d="M193 320c27 27 70 27 97 0l38-38c27-27 27-70 0-97l-135 135z" fill="#f2c779"/>
+  <path d="M205 307l109-109" stroke="#b82d24" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="184" fill="none" stroke="#f2c779" stroke-width="18"/>
+</svg>

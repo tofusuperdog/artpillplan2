@@ -436,7 +436,6 @@ h2 {
 .history-screen,
 .settings-screen,
 .edit-screen,
-.change-pin-screen,
 .form-stack {
   display: grid;
   gap: 12px;
@@ -556,13 +555,16 @@ h2 {
 
 .history-screen h1,
 .settings-screen h1,
-.edit-screen h1,
-.change-pin-screen h1 {
+.edit-screen h1 {
   text-align: center;
 }
 
 .settings-screen h1 {
   font-size: 31px;
+}
+
+.history-filter-panel {
+  padding: 16px;
 }
 
 .filter-select {
@@ -586,8 +588,7 @@ h2 {
   background: #fff5d8;
 }
 
-.tabs button,
-.segment-row button {
+.tabs button {
   border: 1px solid #ca8d3d;
   border-radius: 8px;
   padding: 8px 12px;
@@ -596,8 +597,7 @@ h2 {
   white-space: nowrap;
 }
 
-.tabs .active,
-.segment-row .active {
+.tabs .active {
   color: #fff7d8;
   background: linear-gradient(#d75141, #b32923);
 }
@@ -704,11 +704,44 @@ h2 {
   text-align: center;
 }
 
+.medication-editor-form {
+  display: grid;
+  gap: 12px;
+}
+
+.edit-screen .form-fields {
+  padding: 14px;
+  border: 2px solid #c8954d;
+  border-radius: 14px;
+  background: rgba(255, 248, 225, 0.86);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.72), 0 5px 12px rgba(90, 50, 12, 0.18);
+}
+
 .field {
   display: grid;
   gap: 8px;
   padding: 12px 0;
   border-bottom: 2px dotted #e4bc7d;
+  font-weight: 900;
+}
+
+.field-label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.field-label select {
+  max-width: 58%;
+  min-height: 34px;
+  border: 1px solid #ca8d3d;
+  border-radius: 8px;
+  padding: 4px 8px;
+  color: #b54b1a;
+  background: #fff5d8;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -725,6 +758,10 @@ h2 {
   background: #fff7df;
 }
 
+.field.no-icon div {
+  display: block;
+}
+
 .field input,
 .pin-field input,
 .inline-edit input,
@@ -737,6 +774,12 @@ h2 {
   color: #2b2119;
   font-size: 24px;
   font-weight: 900;
+}
+
+.compact-field input {
+  min-height: 50px;
+  font-size: 17px;
+  line-height: 1.1;
 }
 
 .inline-edit input {
@@ -761,37 +804,84 @@ h2 {
   align-items: end;
   padding: 72px 10px 18px;
   background: rgba(35, 28, 19, 0.45);
-  z-index: 5;
+  z-index: 40;
 }
 
-.stock-modal {
+.pin-modal-backdrop {
+  align-items: center;
+  padding: 18px;
+}
+
+.pin-modal {
+  position: relative;
+  width: 100%;
   max-height: 100%;
   overflow-y: auto;
-  position: relative;
-  padding: 24px 16px;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
   border: 3px solid #d4a15c;
-  border-radius: 22px;
+  border-radius: 18px;
   background: #fff3d4;
   box-shadow: 0 12px 36px rgba(28, 17, 8, 0.34);
 }
 
-.stock-modal h1,
-.stock-modal h2 {
-  text-align: center;
+.pin-modal .info-panel {
+  padding-top: 18px;
+}
+
+.pin-modal-with-close .info-panel h2 {
+  padding-right: 54px;
+}
+
+.pin-modal .pin-field {
+  padding: 12px 0;
+}
+
+.pin-modal .pin-field input {
+  font-size: 24px;
+}
+
+.modal-medication-form {
+  gap: 10px;
+}
+
+.modal-medication-form .field {
+  padding: 10px 0;
+}
+
+.modal-medication-form .field span {
+  font-size: 15px;
+}
+
+.medication-modal-panel h2 {
+  font-size: 19px;
+}
+
+.confirm-copy {
   margin: 0;
-}
-
-.stock-modal h1 {
-  color: #231b15;
-  text-shadow: none;
-  font-style: normal;
-  font-size: 26px;
-}
-
-.stock-modal h2 {
-  color: #bf3b2f;
+  padding: 12px 0 4px;
+  color: #4b3929;
   font-size: 20px;
-  margin-bottom: 12px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.stock-modal {
+  padding: 16px;
+}
+
+.stock-modal-panel {
+  padding-top: 18px;
+}
+
+.stock-modal-med-name {
+  margin: 0 0 12px;
+  color: #4b3929;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .close {
@@ -813,18 +903,11 @@ h2 {
   font-weight: 900;
 }
 
-.stock-modal .segment-row,
 .stock-modal .field,
-.stock-modal .preview,
 .stock-modal .recount-form,
 .stock-modal .hint,
 .stock-modal .error-text {
   font-size: 14px;
-}
-
-.stock-modal .segment-row button {
-  font-size: 13px;
-  padding: 7px 8px;
 }
 
 .stock-modal .field input {
@@ -835,17 +918,14 @@ h2 {
   grid-template-columns: 1fr 48px;
 }
 
+.add-stock-form .field {
+  border-bottom: 0;
+  padding: 8px 0;
+}
+
 .stock-modal .primary,
 .stock-modal .secondary {
   min-height: 48px;
-  font-size: 14px;
-}
-
-.stock-modal .preview h3 {
-  font-size: 15px;
-}
-
-.stock-modal .preview p {
   font-size: 14px;
 }
 
@@ -864,40 +944,6 @@ h2 {
 
 .stock-modal .count-input input {
   font-size: 42px;
-}
-
-.stock-modal .count-input button {
-  font-size: 20px;
-}
-
-.segment-row {
-  display: grid;
-  grid-template-columns: 1fr 1.5fr;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #d5aa69;
-}
-
-.segment-row div {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.preview {
-  padding: 14px;
-}
-
-.preview h3 {
-  color: #ba352b;
-  margin: 0 0 10px;
-}
-
-.preview p {
-  display: flex;
-  justify-content: space-between;
-  border-bottom: 2px dotted #d6ab68;
-  margin: 8px 0;
 }
 
 .recount-form {
@@ -921,8 +967,8 @@ h2 {
 
 .count-input {
   display: grid;
-  grid-template-columns: 1fr 54px;
   padding: 0;
+  overflow: hidden;
 }
 
 .count-input input {
@@ -930,14 +976,15 @@ h2 {
   text-align: center;
   font-family: "Courier New", monospace;
   color: #b01f1b;
+  background:
+    linear-gradient(rgba(176, 31, 27, 0.08), rgba(176, 31, 27, 0.08)),
+    #fffdf3;
+  box-shadow: inset 0 0 0 2px #d9503f;
 }
 
-.count-input button {
-  height: 50%;
-  border: 0;
-  border-left: 1px solid #bf8945;
-  background: #fff2cf;
-  font-size: 25px;
+.count-input input:focus {
+  outline: 3px solid rgba(211, 75, 59, 0.32);
+  outline-offset: -3px;
 }
 
 .hint {

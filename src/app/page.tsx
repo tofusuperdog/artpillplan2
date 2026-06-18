@@ -42,7 +42,7 @@ import {
 } from "@/lib/stock";
 import type { AppData, Medication, MedicationSummary, StatusBadge, StockHistory } from "@/lib/types";
 
-type Screen = "home" | "detail" | "history" | "settings" | "edit" | "changePin";
+type Screen = "home" | "detail" | "history" | "settings" | "edit";
 
 const badgeClass: Record<StatusBadge["kind"], string> = {
   no_stock: "badge danger",
@@ -61,6 +61,9 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [stockId, setStockId] = useState<string | null>(null);
+  const [changePinOpen, setChangePinOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [settingsMedicationEditId, setSettingsMedicationEditId] = useState<string | null | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
 
   const refresh = async () => {
@@ -114,12 +117,12 @@ export default function App() {
   return (
     <DeviceFrame>
       <Header
-        mode={screen === "detail" || screen === "history" || screen === "settings" || screen === "edit" || screen === "changePin" ? "back" : "main"}
-        onBack={() => setScreen(screen === "detail" || screen === "settings" ? "home" : "settings")}
+        mode={screen === "detail" || screen === "history" || screen === "settings" || screen === "edit" ? "back" : "main"}
+        onBack={() => setScreen(screen === "detail" || screen === "history" || screen === "settings" ? "home" : "settings")}
         onHome={() => setScreen("home")}
         onHistory={() => setScreen("history")}
         onSettings={() => setScreen("settings")}
-        showHomeAction={screen !== "settings"}
+        showHomeAction={screen !== "settings" && screen !== "history"}
         title={screen === "settings" ? "Settings" : screen === "history" ? "History" : "ArtPillPlan"}
       />
       {loading && <Panel className="center-panel">Loading ArtPillPlan...</Panel>}
@@ -156,19 +159,10 @@ export default function App() {
           {screen === "settings" && (
             <SettingsScreen
               data={data}
-              onEditMedication={(id) => {
-                setSelectedId(id);
-                setScreen("edit");
-              }}
-              onAddMedication={() => {
-                setSelectedId(null);
-                setScreen("edit");
-              }}
-              onChangePin={() => setScreen("changePin")}
-              onLogout={async () => {
-                await fetch("/api/auth/logout", { method: "POST" });
-                setLoggedIn(false);
-              }}
+              onEditMedication={(id) => setSettingsMedicationEditId(id)}
+              onAddMedication={() => setSettingsMedicationEditId(null)}
+              onChangePin={() => setChangePinOpen(true)}
+              onLogout={() => setLogoutOpen(true)}
               onRefresh={refresh}
               showToast={showToast}
             />
@@ -184,17 +178,38 @@ export default function App() {
               }}
             />
           )}
-          {screen === "changePin" && (
-            <ChangePinScreen
-              settings={data.settings}
-              onSaved={async () => {
-                showToast("PIN saved");
-                await refresh();
-                setScreen("settings");
-              }}
-            />
-          )}
         </>
+      )}
+      {changePinOpen && (
+        <ChangePinModal
+          onClose={() => setChangePinOpen(false)}
+          onSaved={async () => {
+            setChangePinOpen(false);
+            showToast("PIN saved");
+            await refresh();
+          }}
+        />
+      )}
+      {settingsMedicationEditId !== undefined && data && (
+        <MedicationEditorModal
+          medication={settingsMedicationEditId ? data.medications.find((med) => med.id === settingsMedicationEditId) || null : null}
+          onCancel={() => setSettingsMedicationEditId(undefined)}
+          onSaved={async (message) => {
+            setSettingsMedicationEditId(undefined);
+            showToast(message);
+            await refresh();
+          }}
+        />
+      )}
+      {logoutOpen && (
+        <ConfirmLogoutModal
+          onClose={() => setLogoutOpen(false)}
+          onConfirm={async () => {
+            await fetch("/api/auth/logout", { method: "POST" });
+            setLogoutOpen(false);
+            setLoggedIn(false);
+          }}
+        />
       )}
       {stockTarget && data && (
         <StockModal
@@ -456,9 +471,19 @@ function DetailScreen({
   );
 }
 
-function InfoPanel({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function InfoPanel({
+  icon,
+  title,
+  children,
+  className,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <Panel className="info-panel">
+    <Panel className={clsx("info-panel", className)}>
       <h2><span className="mini-icon">{icon}</span>{title}</h2>
       {children}
     </Panel>
@@ -518,7 +543,6 @@ function HistoryScreen({ data }: { data: AppData }) {
                 <p>Exp: {item.expiry_month && item.expiry_year ? formatExpiry(item.expiry_month, item.expiry_year) : "-"}</p>
                 <p className="price">
                   <span>Total: {money(item.price || 0)}</span>
-                  {item.stock_lots?.standard_box_price ? <span>{money(item.stock_lots.standard_box_price)} / box</span> : null}
                 </p>
               </>
             ) : <p>{item.note}</p>}
@@ -608,9 +632,50 @@ function EditMedicationScreen({
   onCancel: () => void;
   onSaved: (message: string) => Promise<void>;
 }) {
+  return (
+    <div className="edit-screen">
+      <h1>{medication ? "Edit Medication" : "Add Medication"}</h1>
+      <MedicationEditorForm medication={medication} onCancel={onCancel} onSaved={onSaved} />
+    </div>
+  );
+}
+
+function MedicationEditorModal({
+  medication,
+  onCancel,
+  onSaved,
+}: {
+  medication: Medication | null;
+  onCancel: () => void;
+  onSaved: (message: string) => Promise<void>;
+}) {
+  return (
+    <div className="modal-backdrop pin-modal-backdrop">
+      <div className="pin-modal pin-modal-with-close">
+        <button className="icon-btn close" onClick={onCancel} aria-label="Close"><X /></button>
+        <InfoPanel className="medication-modal-panel" icon={<Pill />} title={medication ? "Edit Medication" : "Add Medication"}>
+          <MedicationEditorForm medication={medication} onCancel={onCancel} onSaved={onSaved} modal />
+        </InfoPanel>
+      </div>
+    </div>
+  );
+}
+
+function MedicationEditorForm({
+  medication,
+  onCancel,
+  onSaved,
+  modal = false,
+}: {
+  medication: Medication | null;
+  onCancel: () => void;
+  onSaved: (message: string) => Promise<void>;
+  modal?: boolean;
+}) {
   const [name, setName] = useState(medication?.name || "");
   const [daily, setDaily] = useState(String(medication?.daily_dose_pills || ""));
   const [box, setBox] = useState(String(medication?.pills_per_box || ""));
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const submit = async () => {
     await saveMedication({
       id: medication?.id,
@@ -626,35 +691,74 @@ function EditMedicationScreen({
     await onSaved("Medication deleted");
   };
   return (
-    <div className="edit-screen">
-      <h1>{medication ? "Edit Medication" : "Add Medication"}</h1>
-      <Panel>
-        <Field label="Medication name" value={name} onChange={setName} icon={<Pill />} />
-        <Field label="Daily intake" value={daily} onChange={setDaily} icon={<CalendarDays />} suffix="pills/day" />
-        <Field label="Pills per box" value={box} onChange={setBox} icon={<Box />} suffix="pills/box" />
-      </Panel>
+    <div className={clsx("medication-editor-form", modal && "modal-medication-form")}>
+      <div className="form-fields">
+        <Field label="Medication name" value={name} onChange={setName} icon={<Pill />} compact={modal} hideIcon={modal} />
+        <Field label="Daily intake" value={daily} onChange={setDaily} icon={<CalendarDays />} suffix="pills/day" compact={modal} hideIcon={modal} />
+        <Field label="Pills per box" value={box} onChange={setBox} icon={<Box />} suffix="pills/box" compact={modal} hideIcon={modal} />
+      </div>
       <button className="primary wide" onClick={submit}><Save /> Save Changes</button>
-      {medication && <button className="danger-action wide" onClick={remove}><Trash2 /> Delete Medication</button>}
-      <button className="secondary wide" onClick={onCancel}>Cancel</button>
+      {medication && <button className="danger-action wide" onClick={() => setDeleteConfirmOpen(true)}><Trash2 /> Delete Medication</button>}
+      {!modal && <button className="secondary wide" onClick={onCancel}>Cancel</button>}
+      {medication && deleteConfirmOpen && (
+        <ConfirmDeleteMedicationModal
+          medicationName={medication.name}
+          onClose={() => setDeleteConfirmOpen(false)}
+          onConfirm={remove}
+        />
+      )}
     </div>
   );
 }
 
-function Field({ label, value, onChange, icon, suffix }: { label: string; value: string; onChange: (v: string) => void; icon: React.ReactNode; suffix?: string }) {
+function Field({
+  label,
+  value,
+  onChange,
+  icon,
+  suffix,
+  compact = false,
+  hideIcon = false,
+  labelAction,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  icon: React.ReactNode;
+  suffix?: string;
+  compact?: boolean;
+  hideIcon?: boolean;
+  labelAction?: React.ReactNode;
+}) {
   return (
-    <label className="field">
-      <span>{label}</span>
-      <div><input value={value} onChange={(e) => onChange(e.target.value)} placeholder={suffix} />{icon}</div>
+    <label className={clsx("field", compact && "compact-field", hideIcon && "no-icon")}>
+      <span className="field-label">
+        <span>{label}</span>
+        {labelAction}
+      </span>
+      <div><input value={value} onChange={(e) => onChange(e.target.value)} placeholder={suffix} />{!hideIcon && icon}</div>
     </label>
   );
 }
 
-function ChangePinScreen({ settings, onSaved }: { settings: AppData["settings"]; onSaved: () => Promise<void> }) {
+function ChangePinModal({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
   const [pin, setPin] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showIncomplete, setShowIncomplete] = useState(false);
+  const incomplete = showIncomplete && (pin.length !== 4 || confirm.length !== 4);
   const mismatch = pin.length === 4 && confirm.length === 4 && pin !== confirm;
   const submit = async () => {
-    if (pin.length !== 4 || mismatch) return;
+    if (pin.length !== 4 || confirm.length !== 4) {
+      setShowIncomplete(true);
+      return;
+    }
+    if (mismatch) return;
     const response = await fetch("/api/auth/change-pin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -664,14 +768,17 @@ function ChangePinScreen({ settings, onSaved }: { settings: AppData["settings"];
     await onSaved();
   };
   return (
-    <div className="change-pin-screen">
-      <h1>Change PIN</h1>
-      <Panel>
-        <PinField label="New PIN" value={pin} onChange={setPin} />
-        <PinField label="Confirm New PIN" value={confirm} onChange={setConfirm} />
-        {mismatch && <p className="error-text">! PINs do not match</p>}
-      </Panel>
-      <button className="primary wide" onClick={submit}>Save PIN</button>
+    <div className="modal-backdrop pin-modal-backdrop">
+      <div className="pin-modal pin-modal-with-close">
+        <button className="icon-btn close" onClick={onClose} aria-label="Close"><X /></button>
+        <InfoPanel icon={<Lock />} title="Change PIN">
+          <PinField label="New PIN" value={pin} onChange={(value) => { setPin(value); setShowIncomplete(false); }} />
+          <PinField label="Confirm New PIN" value={confirm} onChange={(value) => { setConfirm(value); setShowIncomplete(false); }} />
+          {incomplete && <p className="error-text">! PIN must be 4 digits</p>}
+          {mismatch && <p className="error-text">! PINs do not match</p>}
+        </InfoPanel>
+        <button className="primary wide" onClick={submit}>Save PIN</button>
+      </div>
     </div>
   );
 }
@@ -685,6 +792,46 @@ function PinField({ label, value, onChange }: { label: string; value: string; on
   );
 }
 
+function ConfirmLogoutModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => Promise<void> }) {
+  return (
+    <div className="modal-backdrop pin-modal-backdrop">
+      <div className="pin-modal">
+        <InfoPanel icon={<LogOut />} title="Logout">
+          <p className="confirm-copy">Are you sure you want to logout?</p>
+        </InfoPanel>
+        <div className="action-row">
+          <button className="secondary" onClick={onClose}>Cancel</button>
+          <button className="danger-action" onClick={onConfirm}>Confirm</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteMedicationModal({
+  medicationName,
+  onClose,
+  onConfirm,
+}: {
+  medicationName: string;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  return (
+    <div className="modal-backdrop pin-modal-backdrop">
+      <div className="pin-modal">
+        <InfoPanel icon={<Trash2 />} title="Delete Medication">
+          <p className="confirm-copy">Delete {medicationName}?</p>
+        </InfoPanel>
+        <div className="action-row">
+          <button className="secondary" onClick={onClose}>Cancel</button>
+          <button className="danger-action" onClick={onConfirm}>Confirm</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StockModal({
   summary,
   onClose,
@@ -695,28 +842,41 @@ function StockModal({
   onSaved: (message: string) => Promise<void>;
 }) {
   const [tab, setTab] = useState<"add" | "recount">("add");
+  const [notice, setNotice] = useState<string | null>(null);
   return (
-    <div className="modal-backdrop">
-      <div className="stock-modal">
+    <div className="modal-backdrop pin-modal-backdrop">
+      <div className="pin-modal stock-modal pin-modal-with-close">
         <button className="icon-btn close" onClick={onClose}><X /></button>
-        <h1>{summary.medication.name}</h1>
-        <h2>Stock</h2>
-        <div className="tabs">
-          <button className={tab === "add" ? "active" : ""} onClick={() => setTab("add")}>Add Stock</button>
-          <button className={tab === "recount" ? "active" : ""} onClick={() => setTab("recount")}>Recount Stock</button>
-        </div>
-        {tab === "add" ? <AddStockForm summary={summary} onSaved={onSaved} /> : <RecountForm summary={summary} onSaved={onSaved} />}
+        <InfoPanel className="stock-modal-panel" icon={<PackagePlus />} title="Stock">
+          <p className="stock-modal-med-name">{summary.medication.name}</p>
+          <div className="tabs">
+            <button className={tab === "add" ? "active" : ""} onClick={() => setTab("add")}>Add Stock</button>
+            <button className={tab === "recount" ? "active" : ""} onClick={() => setTab("recount")}>Recount Stock</button>
+          </div>
+          {tab === "add"
+            ? <AddStockForm summary={summary} onNotify={setNotice} onSaved={onSaved} />
+            : <RecountForm summary={summary} onNotify={setNotice} onSaved={onSaved} />}
+        </InfoPanel>
       </div>
+      {notice && <StockNoticeModal message={notice} onClose={() => setNotice(null)} />}
     </div>
   );
 }
 
-function AddStockForm({ summary, onSaved }: { summary: MedicationSummary; onSaved: (message: string) => Promise<void> }) {
+function AddStockForm({
+  summary,
+  onNotify,
+  onSaved,
+}: {
+  summary: MedicationSummary;
+  onNotify: (message: string) => void;
+  onSaved: (message: string) => Promise<void>;
+}) {
   const [quantityType, setQuantityType] = useState<"pills" | "boxes">("pills");
-  const [quantity, setQuantity] = useState("30");
+  const [quantity, setQuantity] = useState("");
   const [priceType, setPriceType] = useState<"total" | "box">("total");
-  const [price, setPrice] = useState("600");
-  const [expiry, setExpiry] = useState("12/2026");
+  const [price, setPrice] = useState("");
+  const [expiry, setExpiry] = useState("");
   const qty = Number(quantity);
   const rawPills = quantityType === "pills" ? qty : qty * summary.medication.pills_per_box;
   const receivedPills = Number.isFinite(rawPills) ? rawPills : 0;
@@ -730,7 +890,14 @@ function AddStockForm({ summary, onSaved }: { summary: MedicationSummary; onSave
     ? "Quantity must result in whole pills. Please adjust boxes or use Total pills."
     : expiryError;
   const save = async () => {
-    if (error || !Number.isFinite(totalPrice) || totalPrice <= 0) return;
+    if (error) {
+      onNotify(error);
+      return;
+    }
+    if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
+      onNotify("Price must be greater than 0.");
+      return;
+    }
     const [month, year] = expiry.split("/").map(Number);
     await addStockLot({
       medicationId: summary.medication.id,
@@ -744,46 +911,54 @@ function AddStockForm({ summary, onSaved }: { summary: MedicationSummary; onSave
     await onSaved("Stock added successfully");
   };
   return (
-    <div className="form-stack">
-      <Segment label="Quantity Type" value={quantityType} onChange={setQuantityType} options={[["pills", "Total pills"], ["boxes", "Boxes"]]} />
-      <Field label="Quantity" value={quantity} onChange={setQuantity} icon={<span>{quantityType === "pills" ? "pills" : "boxes"}</span>} />
-      <Segment label="Price Input Type" value={priceType} onChange={setPriceType} options={[["total", "Total price"], ["box", "Price per box"]]} />
-      <Field label={priceType === "total" ? "Total Price" : "Price per Box"} value={price} onChange={setPrice} icon={<span>à¸¿</span>} />
+    <div className="form-stack add-stock-form">
+      <Field
+        label="Quantity"
+        value={quantity}
+        onChange={setQuantity}
+        icon={<span>{quantityType === "pills" ? "pills" : "boxes"}</span>}
+        labelAction={(
+          <select value={quantityType} onChange={(event) => setQuantityType(event.target.value as "pills" | "boxes")}>
+            <option value="pills">Total pills</option>
+            <option value="boxes">Boxes</option>
+          </select>
+        )}
+      />
+      <Field
+        label="Price"
+        value={price}
+        onChange={setPrice}
+        icon={<span>baht</span>}
+        labelAction={(
+          <select value={priceType} onChange={(event) => setPriceType(event.target.value as "total" | "box")}>
+            <option value="total">Total Price</option>
+            <option value="box">Price per box</option>
+          </select>
+        )}
+      />
       <Field label="Expiry Date" value={expiry} onChange={setExpiry} icon={<CalendarDays />} />
-      {error && <p className="error-text">{error}</p>}
-      <Panel className="preview">
-        <h3>PREVIEW</h3>
-        <p><span>Received:</span><strong>{wholePills ? receivedPills : 0} pills</strong></p>
-        <p><span>Total value:</span><strong>{money(totalPrice || 0)}</strong></p>
-        <p><span>Cost:</span><strong>{money(costPerPill || 0)} / pill</strong></p>
-        <p><span>Standard box price:</span><strong>{money(standardBoxPrice || 0)} / box</strong></p>
-        <p><span>Expiry:</span><strong>{expiry}</strong></p>
-      </Panel>
-      <div className="action-row">
-        <button className="secondary">Cancel</button>
-        <button className="primary" onClick={save}><PackagePlus /> Save Stock</button>
-      </div>
+      <button className="primary wide" onClick={save}><PackagePlus /> Save Stock</button>
     </div>
   );
 }
 
-function Segment<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: [T, string][] }) {
-  return (
-    <div className="segment-row">
-      <strong>{label}</strong>
-      <div>
-        {options.map(([key, text]) => <button key={key} className={value === key ? "active" : ""} onClick={() => onChange(key)}>{text}</button>)}
-      </div>
-    </div>
-  );
-}
-
-function RecountForm({ summary, onSaved }: { summary: MedicationSummary; onSaved: (message: string) => Promise<void> }) {
+function RecountForm({
+  summary,
+  onNotify,
+  onSaved,
+}: {
+  summary: MedicationSummary;
+  onNotify: (message: string) => void;
+  onSaved: (message: string) => Promise<void>;
+}) {
   const [counted, setCounted] = useState(String(summary.totalStockPills));
   const value = Number(counted);
   const valid = Number.isInteger(value) && value >= 0;
   const save = async () => {
-    if (!valid) return;
+    if (!valid) {
+      onNotify("Counted pills must be a whole number.");
+      return;
+    }
     await updateLotsForRecount(summary.medication.id, summary.lots, value);
     await onSaved("Stock updated successfully");
   };
@@ -794,11 +969,22 @@ function RecountForm({ summary, onSaved }: { summary: MedicationSummary; onSaved
       <h3>Counted pills</h3>
       <div className="count-input">
         <input value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="numeric" />
-        <div><button onClick={() => setCounted(String(value + 1))}>âŒƒ</button><button onClick={() => setCounted(String(Math.max(0, value - 1)))}>âŒ„</button></div>
       </div>
-      {!valid && <p className="error-text">Counted pills must be a whole number.</p>}
       <p className="hint">This will update the total stock to the counted amount.</p>
       <button className="primary wide" onClick={save}><Save /> Save Recount</button>
+    </div>
+  );
+}
+
+function StockNoticeModal({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop pin-modal-backdrop">
+      <div className="pin-modal">
+        <InfoPanel icon={<ShieldAlert />} title="Notice">
+          <p className="confirm-copy">{message}</p>
+        </InfoPanel>
+        <button className="primary wide" onClick={onClose}>OK</button>
+      </div>
     </div>
   );
 }
