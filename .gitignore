@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+next-env.d.ts
+
+# Production
+.vercel/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Supabase local state
+supabase/.temp/
+supabase/.branches/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing and coverage
+coverage/
+playwright-report/
+test-results/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

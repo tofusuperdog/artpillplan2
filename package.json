@@ -1,0 +1,30 @@
+{
+  "name": "artpillplanv2",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "supabase:projects": "npx supabase projects list",
+    "supabase:link": "npx supabase link --project-ref rzpjsvgfhyxiaqalmdds",
+    "supabase:migrate": "npx supabase db push",
+    "supabase:seed": "npx supabase db query --linked --file supabase/seed.sql",
+    "supabase:advisors": "npx supabase db advisors --linked"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.11.0",
+    "next": "16.2.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}
