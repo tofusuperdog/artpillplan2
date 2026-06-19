@@ -25,6 +25,7 @@ pnpm-debug.log*
 *.log
 
 # Supabase local state
+supabase/
 supabase/.temp/
 supabase/.branches/
 

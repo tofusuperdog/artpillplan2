@@ -147,13 +147,20 @@ h2 {
   gap: 14px;
 }
 
+.order-entry {
+  margin-bottom: 2px;
+}
+
 .med-card {
   position: relative;
   min-height: 126px;
   width: 100%;
   display: grid;
-  grid-template-columns: 1fr 58px;
-  gap: 14px;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "heading heading"
+    "main actions";
+  gap: 0 14px;
   align-items: center;
   padding: 18px 14px 16px 34px;
   text-align: left;
@@ -171,13 +178,29 @@ h2 {
 }
 
 .card-main {
+  grid-area: main;
   min-width: 0;
 }
 
-.card-main h2 {
+.card-heading {
+  grid-area: heading;
+  min-width: 0;
+  display: grid;
+  gap: 0;
+}
+
+.card-title {
   font-size: 24px;
-  line-height: 1.04;
-  margin-bottom: 2px;
+  line-height: 0.96;
+  overflow-wrap: anywhere;
+}
+
+.card-subtitle {
+  color: #5d554c;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  overflow-wrap: anywhere;
 }
 
 .days-readout {
@@ -259,6 +282,14 @@ h2 {
   width: 56px;
   height: 56px;
   border-radius: 16px;
+}
+
+.card-actions {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: repeat(2, 56px);
+  gap: 8px;
+  align-items: center;
 }
 
 .badge.danger { color: #b32725; }
@@ -422,14 +453,10 @@ h2 {
   color: #231b15;
   text-shadow: none;
   font-style: normal;
+  font-size: 24px;
+  line-height: 1.04;
   margin: 0;
-}
-
-.detail-title span {
-  color: #ba4c1d;
-  border: 1px solid #d58937;
-  border-radius: 5px;
-  padding: 2px 8px;
+  overflow-wrap: anywhere;
 }
 
 .detail-screen,
@@ -512,6 +539,22 @@ h2 {
   border: 1px solid #d5aa69;
   border-radius: 8px;
   background: rgba(255, 248, 226, 0.72);
+}
+
+.history-line + .history-line {
+  margin-top: 8px;
+}
+
+.history-line time {
+  flex: 0 0 auto;
+  color: #76512f;
+  font-weight: 900;
+}
+
+.history-line span {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
 }
 
 .action-row {
@@ -607,6 +650,12 @@ h2 {
   padding: 14px;
 }
 
+.history-card-button {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+}
+
 .history-card-main {
   min-width: 0;
 }
@@ -634,6 +683,27 @@ h2 {
   margin: 5px 0;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.history-edit-modal {
+  padding: 16px;
+}
+
+.history-edit-panel {
+  padding-top: 18px;
+}
+
+.history-edit-form {
+  gap: 6px;
+}
+
+.history-edit-form .field {
+  border-bottom: 0;
+  padding: 8px 0;
+}
+
+.nested-modal-backdrop {
+  z-index: 50;
 }
 
 .history-screen p {
@@ -871,8 +941,55 @@ h2 {
   padding: 16px;
 }
 
-.stock-modal-panel {
+.stock-modal-panel,
+.order-modal-panel {
   padding-top: 18px;
+}
+
+.order-modal {
+  padding: 16px;
+}
+
+.order-modal-panel h2 {
+  font-size: 18px;
+  line-height: 1.05;
+}
+
+.order-inputs {
+  display: grid;
+  gap: 10px;
+}
+
+.order-date-field input {
+  border: 2px double #bf8945;
+  border-radius: 12px;
+  background: #fff7df;
+}
+
+.order-result {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.order-copy-box {
+  max-height: 220px;
+  overflow: auto;
+  padding: 12px;
+  border: 2px solid #d5aa69;
+  border-radius: 10px;
+  background: rgba(255, 248, 226, 0.72);
+}
+
+.order-copy-box pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #3d2c20;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .stock-modal-med-name {
@@ -1050,7 +1167,11 @@ h2 {
     font-size: 29px;
   }
 
-  .card-main h2 {
+  .card-title {
+    font-size: 21px;
+  }
+
+  .detail-title h1 {
     font-size: 21px;
   }
 
@@ -1064,7 +1185,7 @@ h2 {
 
   .med-card {
     min-height: 118px;
-    grid-template-columns: 1fr 52px;
+    grid-template-columns: 1fr auto;
     padding-right: 12px;
   }
 
@@ -1077,6 +1198,11 @@ h2 {
   .med-card .stock {
     width: 50px;
     height: 50px;
+  }
+
+  .card-actions {
+    grid-template-columns: repeat(2, 50px);
+    gap: 6px;
   }
 
   .stat-grid,

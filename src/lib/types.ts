@@ -3,6 +3,8 @@ export type StockHistoryType = "add_stock" | "recount_stock";
 export interface Medication {
   id: string;
   name: string;
+  brand_name: string | null;
+  generic_name: string | null;
   daily_dose_pills: number;
   pills_per_box: number;
   is_active: boolean;
@@ -36,7 +38,7 @@ export interface StockHistory {
   expiry_year: number | null;
   note: string | null;
   created_at: string;
-  medications?: Pick<Medication, "id" | "name">;
+  medications?: Pick<Medication, "id" | "name" | "brand_name" | "generic_name">;
   stock_lots?: Pick<StockLot, "lot_code" | "standard_box_price"> | null;
 }
 

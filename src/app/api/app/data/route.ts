@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasSessionCookie } from "@/lib/serverAuth";
+import { syncDailyStockConsumption } from "@/lib/serverStockSync";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import type { AppSettings, Medication, StockHistory, StockLot } from "@/lib/types";
 
@@ -11,9 +12,14 @@ const DEFAULT_SETTINGS: AppSettings = {
   updated_at: new Date().toISOString(),
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await hasSessionCookie())) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  if (searchParams.get("sync") !== "false") {
+    await syncDailyStockConsumption();
   }
 
   const [medicationsResult, lotsResult, historyResult, settingsResult] = await Promise.all([
@@ -21,7 +27,7 @@ export async function GET() {
     supabaseAdmin.from("stock_lots").select("*").order("created_at", { ascending: true }),
     supabaseAdmin
       .from("stock_history")
-      .select("*, medications(id,name), stock_lots(lot_code,standard_box_price)")
+      .select("*, medications(id,name,brand_name,generic_name), stock_lots(lot_code,standard_box_price)")
       .order("created_at", { ascending: false })
       .limit(30),
     supabaseAdmin

@@ -15,8 +15,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function loadAppData(): Promise<AppData> {
-  return api<AppData>("/api/app/data");
+export async function loadAppData(options: { syncDailyStock?: boolean } = {}): Promise<AppData> {
+  const query = options.syncDailyStock === false ? "?sync=false" : "";
+  return api<AppData>(`/api/app/data${query}`);
 }
 
 export async function addStockLot(input: {
@@ -45,9 +46,31 @@ export async function updateLotsForRecount(
   });
 }
 
+export async function editHistoryItem(input: {
+  id: string;
+  quantityPills: number;
+  totalPrice?: number;
+  expiryMonth?: number;
+  expiryYear?: number;
+  note?: string;
+}) {
+  await api("/api/app/action", {
+    method: "POST",
+    body: JSON.stringify({ action: "edit_history_item", input }),
+  });
+}
+
+export async function deleteHistoryItem(id: string) {
+  await api("/api/app/action", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete_history_item", input: { id } }),
+  });
+}
+
 export async function saveMedication(input: {
   id?: string;
-  name: string;
+  brandName: string;
+  genericName?: string;
   dailyDosePills: number;
   pillsPerBox: number;
 }) {
