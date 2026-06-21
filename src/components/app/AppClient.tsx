@@ -71,12 +71,18 @@ function medicationIdFromPathname(pathname: string) {
   return decodeURIComponent(pathname.replace("/medications/", "").split("/")[0] || "");
 }
 
-export default function AppClient() {
+export default function AppClient({
+  initialData = null,
+  initialError = null,
+}: {
+  initialData?: AppData | null;
+  initialError?: string | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
-  const [data, setData] = useState<AppData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<AppData | null>(initialData);
+  const [error, setError] = useState<string | null>(initialError);
+  const [loading, setLoading] = useState(!initialData && !initialError);
   const [stockId, setStockId] = useState<string | null>(null);
   const [orderOpen, setOrderOpen] = useState(false);
   const [changePinOpen, setChangePinOpen] = useState(false);
@@ -107,7 +113,7 @@ export default function AppClient() {
   const refreshAfterSave = () => refresh({ syncDailyStock: false, showLoading: false });
 
   useEffect(() => {
-    refresh();
+    if (!initialData && !initialError) refresh();
   }, []);
 
   const summaries = useMemo(() => {
