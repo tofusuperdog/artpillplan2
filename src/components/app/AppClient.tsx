@@ -80,6 +80,7 @@ export default function AppClient({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [activePathname, setActivePathname] = useState(pathname);
   const [data, setData] = useState<AppData | null>(initialData);
   const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(!initialData && !initialError);
@@ -116,6 +117,23 @@ export default function AppClient({
     if (!initialData && !initialError) refresh();
   }, []);
 
+  useEffect(() => {
+    setActivePathname(pathname);
+  }, [pathname]);
+
+  useEffect(() => {
+    const handlePopState = () => setActivePathname(window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const navigate = (nextPathname: string) => {
+    if (nextPathname === activePathname) return;
+    window.history.pushState(null, "", nextPathname);
+    setActivePathname(nextPathname);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
   const summaries = useMemo(() => {
     if (!data) return [];
     return sortSummariesForHome(
@@ -123,8 +141,8 @@ export default function AppClient({
     );
   }, [data]);
 
-  const screen = screenFromPathname(pathname);
-  const routeMedicationId = medicationIdFromPathname(pathname);
+  const screen = screenFromPathname(activePathname);
+  const routeMedicationId = medicationIdFromPathname(activePathname);
   const selected = routeMedicationId ? summaries.find((item) => item.medication.id === routeMedicationId) || null : null;
   const stockTarget = summaries.find((item) => item.medication.id === stockId) || null;
 
@@ -137,10 +155,10 @@ export default function AppClient({
     <DeviceFrame>
       <Header
         mode={screen === "detail" || screen === "history" || screen === "settings" ? "back" : "main"}
-        onBack={() => router.push("/main")}
-        onHome={() => router.push("/main")}
-        onHistory={() => router.push("/history")}
-        onSettings={() => router.push("/settings")}
+        onBack={() => navigate("/main")}
+        onHome={() => navigate("/main")}
+        onHistory={() => navigate("/history")}
+        onSettings={() => navigate("/settings")}
         showHomeAction={screen !== "settings" && screen !== "history" && screen !== "detail"}
         title={screen === "settings" ? "Settings" : screen === "history" ? "History" : screen === "detail" ? "Detail" : "ArtPillPlan"}
       />
@@ -159,7 +177,7 @@ export default function AppClient({
           {screen === "home" && (
             <HomeScreen
               summaries={summaries}
-              onOpenDetail={(id) => router.push(`/medications/${id}`)}
+              onOpenDetail={(id) => navigate(`/medications/${id}`)}
               onOpenStock={setStockId}
               onOpenOrder={() => setOrderOpen(true)}
             />
@@ -192,7 +210,7 @@ export default function AppClient({
             <Panel className="center-panel">
               <ShieldAlert />
               <h2>Medication not found</h2>
-              <button className="primary wide" onClick={() => router.push("/main")}>Back Home</button>
+              <button className="primary wide" onClick={() => navigate("/main")}>Back Home</button>
             </Panel>
           )}
         </>
