@@ -3,6 +3,6 @@ import { hasSessionCookie } from "@/lib/serverAuth";
 import { redirect } from "next/navigation";
 
 export default async function HomePage() {
-  if (await hasSessionCookie()) redirect("/main");
+  if (await hasSessionCookie()) redirect("/home");
   return <LoginClient />;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Pill, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -11,7 +11,7 @@ export default function LoginClient() {
     <DeviceFrame>
       <PinLogin
         onSuccess={() => {
-          router.replace("/main");
+          router.replace("/home");
           router.refresh();
         }}
       />
@@ -30,7 +30,7 @@ function DeviceFrame({ children }: { children: React.ReactNode }) {
         <Wordmark />
         <Panel className="unsupported-panel">
           <h1>Mobile Only</h1>
-          <p>ArtPillPlan is designed for mobile use only.</p>
+          <p>ArtPlan is designed for mobile use only.</p>
           <p>Please open this app on a phone-width screen.</p>
         </Panel>
       </div>
@@ -40,14 +40,19 @@ function DeviceFrame({ children }: { children: React.ReactNode }) {
 
 function Logo() {
   return (
-    <div className="logo-mark" aria-label="ArtPillPlan logo">
-      <Pill size={34} />
+    <div className="logo-mark login-logo-mark" aria-label="ArtPlan 76 logo">
+      <img src="/icons/artplan-76-login.png" alt="" />
     </div>
   );
 }
 
-function Wordmark({ children = "ArtPillPlan" }: { children?: React.ReactNode }) {
-  return <div className="wordmark">{children}</div>;
+function Wordmark() {
+  return (
+    <div className="wordmark login-wordmark" aria-label="ArtPlan 76">
+      <span className="login-wordmark-name">ArtPlan</span>
+      <span className="login-wordmark-year">76</span>
+    </div>
+  );
 }
 
 function Panel({ children, className }: { children: React.ReactNode; className?: string }) {

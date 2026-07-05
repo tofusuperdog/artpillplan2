@@ -156,11 +156,12 @@ export default function AppClient({
       <Header
         mode={screen === "detail" || screen === "history" || screen === "settings" ? "back" : "main"}
         onBack={() => navigate("/main")}
+        onMainBack={() => router.push("/home")}
         onHome={() => navigate("/main")}
         onHistory={() => navigate("/history")}
         onSettings={() => navigate("/settings")}
         showHomeAction={screen !== "settings" && screen !== "history" && screen !== "detail"}
-        title={screen === "settings" ? "Settings" : screen === "history" ? "History" : screen === "detail" ? "Detail" : "ArtPillPlan"}
+        title={screen === "settings" ? "Settings" : screen === "history" ? "History" : screen === "detail" ? "Detail" : "Medic Stock"}
       />
       {loading && <Panel className="center-panel">Loading ArtPillPlan...</Panel>}
       {error && (
@@ -304,6 +305,7 @@ function Wordmark({ children = "ArtPillPlan" }: { children?: React.ReactNode }) 
 function Header({
   mode,
   onBack,
+  onMainBack,
   onHome,
   onHistory,
   onSettings,
@@ -312,6 +314,7 @@ function Header({
 }: {
   mode: "main" | "back";
   onBack: () => void;
+  onMainBack?: () => void;
   onHome: () => void;
   onHistory: () => void;
   onSettings: () => void;
@@ -322,6 +325,8 @@ function Header({
     <header className="top-header">
       {mode === "back" ? (
         <button className="icon-btn" onClick={onBack} aria-label="Back"><ArrowLeft /></button>
+      ) : onMainBack ? (
+        <button className="icon-btn" onClick={onMainBack} aria-label="Back to home"><ArrowLeft /></button>
       ) : (
         <Logo />
       )}

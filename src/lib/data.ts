@@ -1,4 +1,4 @@
-import type { AppData, AppSettings, StockLot } from "./types";
+import type { AppData, AppSettings, BloodPressureData, BpMeasurementContext, BpMedicationRelation, StockLot } from "./types";
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -91,5 +91,35 @@ export async function saveSettings(_settings: AppSettings, patch: Partial<AppSet
   await api("/api/app/action", {
     method: "POST",
     body: JSON.stringify({ action: "save_settings", input: patch }),
+  });
+}
+
+export async function loadBloodPressureData(): Promise<BloodPressureData> {
+  return api<BloodPressureData>("/api/bp/data");
+}
+
+export async function saveBloodPressureReading(input: {
+  id?: string;
+  measuredAt: string;
+  measurementContext: BpMeasurementContext;
+  medicationRoundId?: string | null;
+  medicationRelation?: BpMedicationRelation | null;
+  bp1: { sys: number; dia: number; pulse: number };
+  bp2?: { sys: number; dia: number; pulse: number } | null;
+  bp3?: { sys: number; dia: number; pulse: number } | null;
+  symptoms?: string[];
+  otherSymptom?: string | null;
+  note?: string | null;
+}) {
+  await api("/api/bp/action", {
+    method: "POST",
+    body: JSON.stringify({ action: "save_log", input }),
+  });
+}
+
+export async function deleteBloodPressureReading(id: string) {
+  await api("/api/bp/action", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete_log", input: { id } }),
   });
 }
