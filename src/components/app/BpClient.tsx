@@ -82,7 +82,7 @@ export default function BpClient({
   };
 
   const setMeasuredAt = (measuredAt: string) => {
-    const roundId = form.measurementContext === "around_medication"
+    const roundId = form.measurementContext === "around_medication" || form.measurementContext === "symptom_check"
       ? autoRoundId(measuredAt, activeRounds) || form.medicationRoundId
       : "";
     setForm({ ...form, measuredAt, medicationRoundId: roundId });
@@ -99,7 +99,7 @@ export default function BpClient({
         id: editingLog?.id,
         measuredAt: new Date(form.measuredAt).toISOString(),
         measurementContext: form.measurementContext,
-        medicationRoundId: form.measurementContext === "around_medication" ? form.medicationRoundId : null,
+        medicationRoundId: form.measurementContext === "around_medication" || form.measurementContext === "symptom_check" ? form.medicationRoundId : null,
         medicationRelation: form.measurementContext === "around_medication" ? form.medicationRelation : null,
         bp1: toBpInput(form.bp1),
         bp2: isCompleteBp(form.bp2) ? toBpInput(form.bp2) : null,
@@ -381,6 +381,10 @@ function buildTrendChart(logs: BpLog[], days: number, mode: TrendMode, metric: T
     log.measurement_context === "around_medication" &&
     (log.bp_medication_rounds?.name || "").toLowerCase().includes(roundName)
   );
+  const noonSymptomLogs = (items: BpLog[]) => items.filter((log) =>
+    log.measurement_context === "symptom_check" &&
+    (log.bp_medication_rounds?.name || "").toLowerCase().includes("noon")
+  );
   const colors = ["#b32923", "#1f6f8b", "#527145", "#6a328a", "#d97822", "#2b2119"];
   let series: TrendSeries[];
 
@@ -412,7 +416,7 @@ function buildTrendChart(logs: BpLog[], days: number, mode: TrendMode, metric: T
   } else if (mode === "day_parts") {
     series = [
       ...groupedSeries("Morning avg", colors[0], buckets.map((bucket) => byRound(bucket.logs, "morning"))),
-      ...groupedSeries("Noon", colors[2], buckets.map((bucket) => bucket.logs.filter((log) => log.measurement_context === "symptom_check"))),
+      ...groupedSeries("Noon", colors[2], buckets.map((bucket) => noonSymptomLogs(bucket.logs))),
       ...groupedSeries("Evening avg", colors[1], buckets.map((bucket) => byRound(bucket.logs, "evening"))),
     ];
   } else {
@@ -524,6 +528,7 @@ function LogView(props: {
     return <SavedSummary log={savedLog} onEdit={props.editSaved} onAddAnother={props.addAnother} onDone={props.done} />;
   }
   const aroundMedication = form.measurementContext === "around_medication";
+  const showMedicationRound = aroundMedication || form.measurementContext === "symptom_check";
   return (
     <section className="retro-panel bp-form-panel">
       <h1>{editing ? "Edit BP Log" : "Log BP"}</h1>
@@ -538,13 +543,13 @@ function LogView(props: {
           <button key={value} className={form.measurementContext === value ? "active" : ""} onClick={() => setForm({
             ...form,
             measurementContext: value,
-            medicationRoundId: value === "around_medication" ? autoRoundId(form.measuredAt, data.rounds.filter((round) => round.is_active)) : "",
+            medicationRoundId: value === "around_medication" || value === "symptom_check" ? autoRoundId(form.measuredAt, data.rounds.filter((round) => round.is_active)) : "",
             medicationRelation: null,
           })}>{contextLabel(value)}</button>
         ))}
       </div>
 
-      {aroundMedication && (
+      {showMedicationRound && (
         <div className="bp-form-grid">
           <label className="field compact-field no-icon">
             <span>Medication Round</span>
@@ -557,12 +562,12 @@ function LogView(props: {
               </select>
             </div>
           </label>
-          <div className="bp-choice-group inline">
+          {aroundMedication && <div className="bp-choice-group inline">
             <span>Medication Relation</span>
             {(["before", "after"] as BpMedicationRelation[]).map((value) => (
               <button key={value} className={form.medicationRelation === value ? "active" : ""} onClick={() => setForm({ ...form, medicationRelation: value })}>{value === "before" ? "Before Medication" : "After Medication"}</button>
             ))}
-          </div>
+          </div>}
         </div>
       )}
 

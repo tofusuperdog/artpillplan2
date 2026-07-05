@@ -64,7 +64,7 @@ async function saveLog(input: SaveLogInput) {
   const payload = {
     measured_at: measuredAt.toISOString(),
     measurement_context: input.measurementContext,
-    medication_round_id: input.measurementContext === "around_medication" ? input.medicationRoundId : null,
+    medication_round_id: input.measurementContext === "around_medication" || input.measurementContext === "symptom_check" ? input.medicationRoundId || null : null,
     medication_relation: input.measurementContext === "around_medication" ? input.medicationRelation : null,
     bp1_sys: bp1.sys,
     bp1_dia: bp1.dia,
