@@ -2,6 +2,8 @@
 
 import { Activity, Heart, LogOut, Pill, ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { loadAppData, loadBloodPressureData } from "@/lib/data";
 import {
   sortSummariesForHome,
   summarizeMedication,
@@ -9,19 +11,54 @@ import {
 import type { AppData, BloodPressureSummary, MedicationSummary } from "@/lib/types";
 
 export default function HomeClient({
-  initialData,
-  bpSummary,
+  initialData = null,
+  initialBpSummary = null,
 }: {
-  initialData: AppData;
-  bpSummary: BloodPressureSummary | null;
+  initialData?: AppData | null;
+  initialBpSummary?: BloodPressureSummary | null;
 }) {
   const router = useRouter();
-  const summaries = sortSummariesForHome(
-    initialData.medications.map((medication) =>
-      summarizeMedication(medication, initialData.stockLots, initialData.stockHistory, initialData.settings),
-    ),
-  );
+  const [data, setData] = useState<AppData | null>(initialData);
+  const [bpSummary, setBpSummary] = useState<BloodPressureSummary | null>(initialBpSummary);
+  const [error, setError] = useState<string | null>(null);
+  const loading = !data && !error;
+  const summaries = data
+    ? sortSummariesForHome(
+      data.medications.map((medication) =>
+        summarizeMedication(medication, data.stockLots, data.stockHistory, data.settings),
+      ),
+    )
+    : [];
   const medicationStatus = getMedicationStatus(summaries);
+
+  useEffect(() => {
+    if (initialData) return;
+
+    let cancelled = false;
+    Promise.all([
+      loadAppData({ syncDailyStock: false }),
+      loadBloodPressureData().catch(() => null),
+    ])
+      .then(([appData, bpData]) => {
+        if (cancelled) return;
+        setData(appData);
+        setBpSummary(bpData?.summary || null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : "Unable to load home data.";
+        if (message === "Unauthorized") {
+          router.replace("/");
+          router.refresh();
+          return;
+        }
+        setError(message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialData, router]);
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -52,8 +89,8 @@ export default function HomeClient({
               <h2>Medic Stock</h2>
             </div>
             <div className="module-status">
-              <span><strong>Lowest stock</strong>{medicationStatus.lowestStock}</span>
-              <span><strong>Near expiry</strong>{medicationStatus.nearExpiry}</span>
+              <span><strong>Lowest stock</strong>{loading ? "Loading..." : error ? "Unavailable" : medicationStatus.lowestStock}</span>
+              <span><strong>Near expiry</strong>{loading ? "Loading..." : error ? "Unavailable" : medicationStatus.nearExpiry}</span>
             </div>
             <div className="module-action"><ShoppingCart /> Open stock</div>
           </button>
