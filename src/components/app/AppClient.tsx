@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addStockLot,
   deleteHistoryItem,
@@ -90,6 +90,7 @@ export default function AppClient({
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [settingsMedicationEditId, setSettingsMedicationEditId] = useState<string | null | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
+  const hasStartedBackgroundSync = useRef(false);
 
   const refresh = async ({
     syncDailyStock = true,
@@ -116,6 +117,32 @@ export default function AppClient({
   useEffect(() => {
     if (!initialData && !initialError) refresh();
   }, []);
+
+  useEffect(() => {
+    if (!initialData || hasStartedBackgroundSync.current) return;
+
+    hasStartedBackgroundSync.current = true;
+    let cancelled = false;
+
+    // Reconcile the daily deduction without delaying the first render. This
+    // request returns fresh data once the sync has completed.
+    loadAppData()
+      .then((freshData) => {
+        if (!cancelled) setData(freshData);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : "Unable to refresh app data.";
+        if (message === "Unauthorized") {
+          router.replace("/");
+          router.refresh();
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialData, router]);
 
   useEffect(() => {
     setActivePathname(pathname);

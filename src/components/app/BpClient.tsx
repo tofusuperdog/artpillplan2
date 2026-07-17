@@ -9,15 +9,21 @@ import {
   Pencil,
   Plus,
   Save,
+  Trash2,
   X,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import {
   deleteBloodPressureReading,
+  loadBloodPressurePeriodLogs,
+  loadRecentBloodPressureLogs,
   loadBloodPressureData,
   saveBloodPressureReading,
+  saveSimpleBloodPressureReading,
+  type SimpleBloodPressureLog,
+  updateSimpleBloodPressureReading,
 } from "@/lib/data";
 import type {
   BloodPressureData,
@@ -54,6 +60,42 @@ export default function BpClient({
   const [savedLog, setSavedLog] = useState<BpLog | null>(null);
   const [form, setForm] = useState(() => defaultBpForm(initialData));
   const [toast, setToast] = useState<string | null>(null);
+  const [recentLogs, setRecentLogs] = useState<SimpleBloodPressureLog[]>([]);
+  const [selectedRecentLog, setSelectedRecentLog] = useState<SimpleBloodPressureLog | null>(null);
+  const [selectedReadingDate, setSelectedReadingDate] = useState(todayDateInput());
+  const [readingsLoading, setReadingsLoading] = useState(true);
+  const [summaryDays, setSummaryDays] = useState<7 | 15 | 30>(7);
+  const [summaryLogs, setSummaryLogs] = useState<SimpleBloodPressureLog[]>([]);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const summaryRequestId = useRef(0);
+
+  const refreshRecentLogs = async (date = selectedReadingDate) => {
+    setReadingsLoading(true);
+    try {
+      setRecentLogs(await loadRecentBloodPressureLogs(date));
+    } catch {
+      setRecentLogs([]);
+    } finally {
+      setReadingsLoading(false);
+    }
+  };
+
+  useEffect(() => { void refreshRecentLogs(selectedReadingDate); }, [selectedReadingDate]);
+
+  const refreshSummaryLogs = async (days = summaryDays) => {
+    const requestId = ++summaryRequestId.current;
+    setSummaryLoading(true);
+    try {
+      const logs = await loadBloodPressurePeriodLogs(days);
+      if (requestId === summaryRequestId.current) setSummaryLogs(logs);
+    } catch {
+      if (requestId === summaryRequestId.current) setSummaryLogs([]);
+    } finally {
+      if (requestId === summaryRequestId.current) setSummaryLoading(false);
+    }
+  };
+
+  useEffect(() => { void refreshSummaryLogs(summaryDays); }, [summaryDays]);
 
   const activeRounds = (data?.rounds || []).filter((round) => round.is_active);
   const showBp3Suggestion = hasHighVariation(form.bp1, form.bp2);
@@ -159,31 +201,33 @@ export default function BpClient({
           </section>
         )}
 
-        {data && view === "dashboard" && (
-          <Dashboard
-            data={data}
-            onLog={() => router.push("/bp/log")}
-          />
-        )}
+        {view === "dashboard" && <Dashboard
+          logs={recentLogs}
+          selectedDate={selectedReadingDate}
+          loading={readingsLoading}
+          onDateChange={setSelectedReadingDate}
+          summaryDays={summaryDays}
+          summaryLogs={summaryLogs}
+          summaryLoading={summaryLoading}
+          onSummaryDaysChange={setSummaryDays}
+          onLog={() => router.push("/bp/log")}
+          onSelect={setSelectedRecentLog}
+        />}
 
-        {data && view === "log" && (
-          <LogView
-            data={data}
-            form={form}
-            savedLog={savedLog}
-            showBp3Suggestion={showBp3Suggestion}
-            saving={saving}
-            editing={Boolean(editingLog)}
-            setForm={setForm}
-            setMeasuredAt={setMeasuredAt}
-            submit={submitLog}
-            editSaved={() => savedLog && editLog(savedLog)}
-            addAnother={() => { setSavedLog(null); setForm(defaultBpForm(data)); }}
-            done={() => router.push("/bp")}
-          />
+        {view === "log" && (
+          <LogView initialMeasuredAt={form.measuredAt} />
         )}
 
         {data && view === "report" && <ReportView data={data} onEdit={editLog} />}
+
+        {selectedRecentLog && <RecentLogModal
+          log={selectedRecentLog}
+          onClose={() => setSelectedRecentLog(null)}
+          onSaved={async () => {
+            await Promise.all([refreshRecentLogs(), refreshSummaryLogs()]);
+            setSelectedRecentLog(null);
+          }}
+        />}
 
         {toast && <div className="toast">{toast}</div>}
       </div>
@@ -192,24 +236,193 @@ export default function BpClient({
 }
 
 function Dashboard({
-  data,
+  logs,
+  selectedDate,
+  loading,
+  onDateChange,
+  summaryDays,
+  summaryLogs,
+  summaryLoading,
+  onSummaryDaysChange,
   onLog,
+  onSelect,
 }: {
-  data: BloodPressureData;
+  logs: SimpleBloodPressureLog[];
+  selectedDate: string;
+  loading: boolean;
+  onDateChange: (date: string) => void;
+  summaryDays: 7 | 15 | 30;
+  summaryLogs: SimpleBloodPressureLog[];
+  summaryLoading: boolean;
+  onSummaryDaysChange: (days: 7 | 15 | 30) => void;
   onLog: () => void;
+  onSelect: (log: SimpleBloodPressureLog) => void;
 }) {
   return (
     <>
       <div className="bp-top-actions">
         <button className="primary wide" onClick={onLog}><Plus /> Log BP</button>
       </div>
-      <LatestBpCard log={data.summary.latestLog} />
-      <section className="bp-dashboard-stack">
-        <TrendPanel title="Blood Pressure" metric="bp" data={data} />
-        <TrendPanel title="Heart Rate" metric="pulse" data={data} />
+      <PeriodSummary
+        days={summaryDays}
+        logs={summaryLogs}
+        loading={summaryLoading}
+        onDaysChange={onSummaryDaysChange}
+      />
+      <section className="retro-panel bp-recent-panel">
+        <div className="bp-readings-heading">
+          <div><h1>Daily readings</h1></div>
+          <label className="bp-reading-date"><span>Date</span><input type="date" value={selectedDate} onChange={(event) => onDateChange(event.target.value)} /></label>
+        </div>
+        {loading ? <p>Loading readings...</p> : logs.length === 0 ? <p>No blood pressure readings for this day.</p> : <div className="bp-recent-list">
+          {logs.map((log) => <button key={log.id} className="bp-recent-row" onClick={() => onSelect(log)}>
+            <div className="bp-recent-copy">
+              <div className="bp-recent-meta"><span>{measurementRoundLabel(log.measurement_round)}</span><time>{formatReadingTime(log.measured_at)}</time></div>
+              <strong>{log.sys}/{log.dia} mmHg · {log.pulse} bpm</strong>
+            </div>
+          </button>)}
+        </div>}
       </section>
     </>
   );
+}
+
+const summaryRounds: { value: SimpleBloodPressureLog["measurement_round"]; label: string }[] = [
+  { value: "morning_before_medication", label: "Morning before medication" },
+  { value: "morning_after_medication", label: "Morning after medication" },
+  { value: "noon", label: "Noon" },
+  { value: "evening_before_medication", label: "Evening before medication" },
+  { value: "evening_after_medication", label: "Evening after medication" },
+  { value: "bedtime", label: "Before bed" },
+];
+
+function PeriodSummary({
+  days,
+  logs,
+  loading,
+  onDaysChange,
+}: {
+  days: 7 | 15 | 30;
+  logs: SimpleBloodPressureLog[];
+  loading: boolean;
+  onDaysChange: (days: 7 | 15 | 30) => void;
+}) {
+  const [detail, setDetail] = useState<{ label: string; logs: SimpleBloodPressureLog[] } | null>(null);
+
+  return (
+    <section className="retro-panel bp-period-summary">
+      <div className="bp-period-heading">
+        <div><h1>BP summary</h1></div>
+        <div className="bp-period-picker" aria-label="Summary period">
+          {([7, 15, 30] as const).map((value) => <button key={value} className={days === value ? "active" : ""} onClick={() => onDaysChange(value)}>{value} days</button>)}
+        </div>
+      </div>
+      {loading ? <p className="bp-period-status">Loading summary...</p> : <div className="bp-summary-grid">
+        {summaryRounds.map((round) => {
+          const roundLogs = logs.filter((log) => log.measurement_round === round.value);
+          return <RoundSummaryCard key={round.value} label={round.label} logs={roundLogs} onOpen={() => setDetail({ label: round.label, logs: roundLogs })} />;
+        })}
+      </div>}
+      {detail && <RoundSummaryDetail label={detail.label} logs={detail.logs} onClose={() => setDetail(null)} />}
+    </section>
+  );
+}
+
+function RoundSummaryCard({ label, logs, onOpen }: { label: string; logs: SimpleBloodPressureLog[]; onOpen: () => void }) {
+  if (logs.length === 0) return <article className="bp-round-summary bp-round-summary-empty"><h2>{label}</h2><p>No readings</p></article>;
+
+  const average = (field: "sys" | "dia" | "pulse") => Math.round(logs.reduce((sum, log) => sum + log[field], 0) / logs.length);
+  const range = (field: "sys" | "dia" | "pulse") => ({
+    low: Math.min(...logs.map((log) => log[field])),
+    high: Math.max(...logs.map((log) => log[field])),
+  });
+  const sys = range("sys");
+  const dia = range("dia");
+  const pulse = range("pulse");
+
+  return <button className="bp-round-summary bp-round-summary-button" onClick={onOpen} aria-label={`View details for ${label}`}>
+    <h2>{label}</h2>
+    <div className="bp-round-summary-value"><strong>{average("sys")}/{average("dia")} mmHg · {average("pulse")} bpm</strong></div>
+    <div><span>Highest / lowest</span><strong>{sys.high}/{dia.high} – {sys.low}/{dia.low} <em>mmHg</em></strong><b>Pulse {pulse.high} – {pulse.low} bpm</b></div>
+  </button>;
+}
+
+function RoundSummaryDetail({ label, logs, onClose }: { label: string; logs: SimpleBloodPressureLog[]; onClose: () => void }) {
+  const range = (field: "sys" | "dia" | "pulse") => ({
+    low: Math.min(...logs.map((log) => log[field])),
+    high: Math.max(...logs.map((log) => log[field])),
+  });
+  const lowestBloodPressure = logs.reduce((lowest, log) => log.sys < lowest.sys ? log : lowest);
+  const highestBloodPressure = logs.reduce((highest, log) => log.sys > highest.sys ? log : highest);
+  const sys = range("sys");
+  const dia = range("dia");
+  const pulse = range("pulse");
+
+  return <div className="bp-list-modal-backdrop" role="dialog" aria-modal="true" aria-label={`${label} details`}>
+    <section className="bp-list-modal bp-round-detail-modal">
+      <div className="bp-list-modal-header"><h1>{label}</h1><button className="icon-btn" onClick={onClose} aria-label="Close"><X /></button></div>
+      <p>{logs.length} reading{logs.length === 1 ? "" : "s"} in this period</p>
+      <div className="bp-round-detail-values">
+        <div className="bp-round-detail-current"><span>Blood pressure</span><strong>{lowestBloodPressure.sys}/{lowestBloodPressure.dia} – {highestBloodPressure.sys}/{highestBloodPressure.dia}</strong><small>Lowest / highest mmHg (based on SYS)</small></div>
+        <div className="bp-round-detail-current"><span>Pulse</span><strong>{pulse.low} – {pulse.high}</strong><small>Lowest / highest bpm</small></div>
+        <div><span>Blood pressure</span><strong>{sys.high}/{dia.high} – {sys.low}/{dia.low}</strong><small>Highest / lowest mmHg</small></div>
+        <div><span>Pulse</span><strong>{pulse.high} – {pulse.low}</strong><small>Highest / lowest bpm</small></div>
+      </div>
+    </section>
+  </div>;
+}
+
+function RecentLogModal({ log, onClose, onSaved }: { log: SimpleBloodPressureLog; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [measuredAt, setMeasuredAt] = useState(toDateTimeLocal(log.measured_at));
+  const [measurementRound, setMeasurementRound] = useState<SimpleBloodPressureLog["measurement_round"]>(log.measurement_round);
+  const [sys, setSys] = useState(String(log.sys));
+  const [dia, setDia] = useState(String(log.dia));
+  const [pulse, setPulse] = useState(String(log.pulse));
+  const [working, setWorking] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!sys || !dia || !pulse) return setMessage("Please enter SYS, DIA, and Pulse.");
+    setWorking(true);
+    setMessage(null);
+    try {
+      await updateSimpleBloodPressureReading({ id: log.id, measuredAt, measurementRound, sys: Number(sys), dia: Number(dia), pulse: Number(pulse) });
+      await onSaved();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update this reading.");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!window.confirm("Delete this reading?")) return;
+    setWorking(true);
+    setMessage(null);
+    try {
+      await deleteBloodPressureReading(log.id);
+      await onSaved();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to delete this reading.");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return <div className="bp-list-modal-backdrop" role="dialog" aria-modal="true" aria-label="Edit blood pressure reading">
+    <section className="bp-list-modal bp-edit-modal">
+      <div className="bp-list-modal-header"><h1>Edit BP reading</h1><button className="icon-btn" onClick={onClose} aria-label="Close"><X /></button></div>
+      <label className="bp-simple-field"><span>Date & time</span><input type="datetime-local" value={measuredAt} onChange={(event) => setMeasuredAt(event.target.value)} /></label>
+      <label className="bp-simple-field"><span>Measurement round</span><select value={measurementRound} onChange={(event) => setMeasurementRound(event.target.value as SimpleBloodPressureLog["measurement_round"])}>{measurementRounds.map((round) => <option key={round.value} value={round.value}>{round.label}</option>)}</select></label>
+      <div className="bp-modal-values">
+        <label><span>SYS</span><input inputMode="numeric" value={sys} onChange={(event) => setSys(digitsOnly(event.target.value, 3))} /></label>
+        <label><span>DIA</span><input inputMode="numeric" value={dia} onChange={(event) => setDia(digitsOnly(event.target.value, 3))} /></label>
+        <label><span>Pulse</span><input inputMode="numeric" value={pulse} onChange={(event) => setPulse(digitsOnly(event.target.value, 3))} /></label>
+      </div>
+      {message && <p className="bp-simple-status" role="status">{message}</p>}
+      <div className="bp-modal-actions"><button className="secondary" disabled={working} onClick={remove}><Trash2 /> Delete</button><button className="primary" disabled={working} onClick={save}><Save /> Save</button></div>
+    </section>
+  </div>;
 }
 
 function LatestBpCard({ log }: { log: BpLog | null }) {
@@ -509,98 +722,82 @@ function bpExtreme(logs: BpLog[], field: "sys" | "dia", kind: "max" | "min") {
   return kind === "max" ? Math.max(...values) : Math.min(...values);
 }
 
-function LogView(props: {
-  data: BloodPressureData;
-  form: ReturnType<typeof defaultBpForm>;
-  savedLog: BpLog | null;
-  showBp3Suggestion: boolean;
-  saving: boolean;
-  editing: boolean;
-  setForm: (form: ReturnType<typeof defaultBpForm>) => void;
-  setMeasuredAt: (value: string) => void;
-  submit: () => void;
-  editSaved: () => void;
-  addAnother: () => void;
-  done: () => void;
-}) {
-  const { data, form, savedLog, showBp3Suggestion, saving, editing, setForm, setMeasuredAt, submit } = props;
-  if (savedLog) {
-    return <SavedSummary log={savedLog} onEdit={props.editSaved} onAddAnother={props.addAnother} onDone={props.done} />;
-  }
-  const aroundMedication = form.measurementContext === "around_medication";
-  const showMedicationRound = aroundMedication || form.measurementContext === "symptom_check";
-  return (
-    <section className="retro-panel bp-form-panel">
-      <h1>{editing ? "Edit BP Log" : "Log BP"}</h1>
-      <label className="field compact-field no-icon">
-        <span>Measured at</span>
-        <div><input type="datetime-local" value={form.measuredAt} onChange={(event) => setMeasuredAt(event.target.value)} /></div>
-      </label>
+const measurementRounds = [
+  { value: "morning_before_medication", label: "Morning before medication" },
+  { value: "morning_after_medication", label: "Morning after medication" },
+  { value: "noon", label: "Noon" },
+  { value: "evening_before_medication", label: "Evening before medication" },
+  { value: "evening_after_medication", label: "Evening after medication" },
+  { value: "bedtime", label: "Before bed" },
+] as const;
 
-      <div className="bp-choice-group">
-        <span>Why are you measuring?</span>
-        {(["around_medication", "symptom_check"] as BpMeasurementContext[]).map((value) => (
-          <button key={value} className={form.measurementContext === value ? "active" : ""} onClick={() => setForm({
-            ...form,
-            measurementContext: value,
-            medicationRoundId: value === "around_medication" || value === "symptom_check" ? autoRoundId(form.measuredAt, data.rounds.filter((round) => round.is_active)) : "",
-            medicationRelation: null,
-          })}>{contextLabel(value)}</button>
-        ))}
+function LogView({ initialMeasuredAt }: { initialMeasuredAt: string }) {
+  const [measuredAt, setMeasuredAt] = useState(initialMeasuredAt);
+  const [measurementRound, setMeasurementRound] = useState<typeof measurementRounds[number]["value"] | "">("");
+  const [sys, setSys] = useState("");
+  const [dia, setDia] = useState("");
+  const [pulse, setPulse] = useState("");
+  const [savingLog, setSavingLog] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!measurementRound || !sys || !dia || !pulse) {
+      setStatus("Please complete all fields.");
+      return;
+    }
+    setSavingLog(true);
+    setStatus(null);
+    try {
+      await saveSimpleBloodPressureReading({
+        measuredAt,
+        measurementRound,
+        sys: Number(sys),
+        dia: Number(dia),
+        pulse: Number(pulse),
+      });
+      setStatus("Reading saved.");
+      setSys("");
+      setDia("");
+      setPulse("");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to save this reading.");
+    } finally {
+      setSavingLog(false);
+    }
+  };
+
+  return (
+    <section className="retro-panel bp-simple-log-panel">
+      <div className="bp-simple-log-heading">
+        <span>Blood Pressure</span>
+        <h1>Log blood pressure</h1>
       </div>
 
-      {showMedicationRound && (
-        <div className="bp-form-grid">
-          <label className="field compact-field no-icon">
-            <span>Medication Round</span>
-            <div>
-              <select value={form.medicationRoundId} onChange={(event) => setForm({ ...form, medicationRoundId: event.target.value })}>
-                <option value="">Select round</option>
-                {data.rounds.filter((round) => round.is_active).map((round) => (
-                  <option key={round.id} value={round.id}>{round.name}</option>
-                ))}
-              </select>
-            </div>
-          </label>
-          {aroundMedication && <div className="bp-choice-group inline">
-            <span>Medication Relation</span>
-            {(["before", "after"] as BpMedicationRelation[]).map((value) => (
-              <button key={value} className={form.medicationRelation === value ? "active" : ""} onClick={() => setForm({ ...form, medicationRelation: value })}>{value === "before" ? "Before Medication" : "After Medication"}</button>
-            ))}
-          </div>}
-        </div>
-      )}
-
-      <BpInputGroup label="BP1 *" value={form.bp1} onChange={(bp1) => setForm({ ...form, bp1 })} />
-      <BpInputGroup label="BP2 optional" value={form.bp2} onChange={(bp2) => setForm({ ...form, bp2 })} />
-      {showBp3Suggestion && <p className="hint">The first two readings differ by more than 5 mmHg. Please rest 1 minute and consider taking a third reading.</p>}
-      {(showBp3Suggestion || isAnyBpFilled(form.bp3)) && <BpInputGroup label="BP3 optional" value={form.bp3} onChange={(bp3) => setForm({ ...form, bp3 })} />}
-
-      <section className="bp-symptom-panel">
-        <h2>Symptoms</h2>
-        <div className="bp-chip-grid">
-          {symptomOptions.map((symptom) => (
-            <button key={symptom} className={form.symptoms.includes(symptom) ? "active" : ""} onClick={() => setForm({
-              ...form,
-              symptoms: form.symptoms.includes(symptom)
-                ? form.symptoms.filter((item) => item !== symptom)
-                : [...form.symptoms, symptom],
-            })}>{symptom}</button>
-          ))}
-        </div>
-        {form.symptoms.includes("Other") && (
-          <label className="field compact-field">
-            <span>Other symptom</span>
-            <div><input value={form.otherSymptom} onChange={(event) => setForm({ ...form, otherSymptom: event.target.value })} /></div>
-          </label>
-        )}
-      </section>
-
-      <label className="field compact-field no-icon">
-        <span>Note</span>
-        <div><input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="optional" /></div>
+      <label className="bp-simple-field">
+        <span>Date & time</span>
+        <input type="datetime-local" value={measuredAt} onChange={(event) => setMeasuredAt(event.target.value)} aria-label="Date and time" />
       </label>
-      <button className="primary wide" disabled={saving} onClick={submit}><Save /> {saving ? "Saving..." : "Save"}</button>
+
+      <label className="bp-simple-field">
+        <span>Measurement round</span>
+        <select value={measurementRound} onChange={(event) => setMeasurementRound(event.target.value as typeof measurementRound)}>
+          <option value="" disabled>Select a measurement round</option>
+          {measurementRounds.map((round) => <option key={round.value} value={round.value}>{round.label}</option>)}
+        </select>
+      </label>
+
+      <fieldset className="bp-simple-readings">
+        <legend>Reading</legend>
+        <div>
+          <label><span>SYS</span><input inputMode="numeric" value={sys} onChange={(event) => setSys(digitsOnly(event.target.value, 3))} placeholder="120" aria-label="SYS" /><small>mmHg</small></label>
+          <i aria-hidden="true">/</i>
+          <label><span>DIA</span><input inputMode="numeric" value={dia} onChange={(event) => setDia(digitsOnly(event.target.value, 3))} placeholder="80" aria-label="DIA" /><small>mmHg</small></label>
+          <label className="bp-pulse-field"><span>Pulse</span><input inputMode="numeric" value={pulse} onChange={(event) => setPulse(digitsOnly(event.target.value, 3))} placeholder="72" aria-label="Pulse" /><small>bpm</small></label>
+        </div>
+      </fieldset>
+
+      {status && <p className="bp-simple-status" role="status">{status}</p>}
+      <button type="button" className="primary wide bp-simple-save" disabled={savingLog} onClick={save}><Save /> {savingLog ? "SAVING..." : "SAVE"}</button>
     </section>
   );
 }
@@ -825,7 +1022,31 @@ function formatDateTime(value: string) {
   const day = date.toDateString() === today.toDateString()
     ? "Today"
     : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  return `${day}, ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
+  return `${day}, ${date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`;
+}
+
+function formatReadingTime(value: string) {
+  return new Date(value).toLocaleTimeString("en-GB", {
+    timeZone: "Asia/Bangkok",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
+function measurementRoundLabel(value: SimpleBloodPressureLog["measurement_round"]) {
+  return summaryRounds.find((round) => round.value === value)?.label || "Measurement";
+}
+
+function todayDateInput() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find((item) => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function contextLabel(value: BpMeasurementContext) {

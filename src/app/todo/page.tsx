@@ -1,8 +1,8 @@
-import BpClient from "@/components/app/BpClient";
+import TodoClient from "@/components/app/TodoClient";
 import { hasSessionCookie } from "@/lib/serverAuth";
 import { redirect } from "next/navigation";
 
-export default async function BpPage() {
+export default async function TodoPage() {
   if (!(await hasSessionCookie())) redirect("/");
-  return <BpClient />;
+  return <TodoClient />;
 }

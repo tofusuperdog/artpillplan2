@@ -7,6 +7,8 @@ type BpInput = { sys: number; dia: number; pulse: number };
 
 type ActionBody =
   | { action: "save_log"; input: SaveLogInput }
+  | { action: "save_simple_log"; input: SaveSimpleLogInput }
+  | { action: "update_simple_log"; input: SaveSimpleLogInput & { id: string } }
   | { action: "delete_log"; input: { id: string } };
 
 type SaveLogInput = {
@@ -23,6 +25,16 @@ type SaveLogInput = {
   note?: string | null;
 };
 
+type MeasurementRound = "morning_before_medication" | "morning_after_medication" | "noon" | "evening_before_medication" | "evening_after_medication" | "bedtime";
+
+type SaveSimpleLogInput = {
+  measuredAt: string;
+  measurementRound: MeasurementRound;
+  sys: number;
+  dia: number;
+  pulse: number;
+};
+
 export async function POST(request: Request) {
   if (!(await hasSessionCookie())) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -33,12 +45,50 @@ export async function POST(request: Request) {
 
   try {
     if (body.action === "save_log") await saveLog(body.input);
+    if (body.action === "save_simple_log") await saveSimpleLog(body.input);
+    if (body.action === "update_simple_log") await updateSimpleLog(body.input);
     if (body.action === "delete_log") await deleteRow("bp_logs", body.input.id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Action failed";
     return NextResponse.json({ message }, { status: 500 });
   }
+}
+
+async function saveSimpleLog(input: SaveSimpleLogInput) {
+  const measuredAt = new Date(input.measuredAt);
+  if (Number.isNaN(measuredAt.getTime())) throw new Error("Measured time is invalid.");
+  const rounds: MeasurementRound[] = ["morning_before_medication", "morning_after_medication", "noon", "evening_before_medication", "evening_after_medication", "bedtime"];
+  if (!rounds.includes(input.measurementRound)) throw new Error("Measurement round is invalid.");
+
+  const bp = normalizeBp({ sys: input.sys, dia: input.dia, pulse: input.pulse }, true);
+  const { error } = await supabaseAdmin.from("bp_logs").insert({
+    measured_at: measuredAt.toISOString(),
+    measurement_round: input.measurementRound,
+    sys: bp.sys,
+    dia: bp.dia,
+    pulse: bp.pulse,
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function updateSimpleLog(input: SaveSimpleLogInput & { id: string }) {
+  if (!input.id) throw new Error("Record is required.");
+  const measuredAt = new Date(input.measuredAt);
+  if (Number.isNaN(measuredAt.getTime())) throw new Error("Measured time is invalid.");
+  const rounds: MeasurementRound[] = ["morning_before_medication", "morning_after_medication", "noon", "evening_before_medication", "evening_after_medication", "bedtime"];
+  if (!rounds.includes(input.measurementRound)) throw new Error("Measurement round is invalid.");
+
+  const bp = normalizeBp({ sys: input.sys, dia: input.dia, pulse: input.pulse }, true);
+  const { error } = await supabaseAdmin.from("bp_logs").update({
+    measured_at: measuredAt.toISOString(),
+    measurement_round: input.measurementRound,
+    sys: bp.sys,
+    dia: bp.dia,
+    pulse: bp.pulse,
+    updated_at: new Date().toISOString(),
+  }).eq("id", input.id);
+  if (error) throw new Error(error.message);
 }
 
 async function saveLog(input: SaveLogInput) {

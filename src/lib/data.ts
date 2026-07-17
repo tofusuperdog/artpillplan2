@@ -117,6 +117,54 @@ export async function saveBloodPressureReading(input: {
   });
 }
 
+export async function saveSimpleBloodPressureReading(input: {
+  measuredAt: string;
+  measurementRound: "morning_before_medication" | "morning_after_medication" | "noon" | "evening_before_medication" | "evening_after_medication" | "bedtime";
+  sys: number;
+  dia: number;
+  pulse: number;
+}) {
+  await api("/api/bp/action", {
+    method: "POST",
+    body: JSON.stringify({ action: "save_simple_log", input }),
+  });
+}
+
+export type SimpleBloodPressureLog = {
+  id: string;
+  measured_at: string;
+  measurement_round: "morning_before_medication" | "morning_after_medication" | "noon" | "evening_before_medication" | "evening_after_medication" | "bedtime";
+  sys: number;
+  dia: number;
+  pulse: number;
+};
+
+export async function loadRecentBloodPressureLogs(date: string): Promise<SimpleBloodPressureLog[]> {
+  return api<SimpleBloodPressureLog[]>(`/api/bp/logs?date=${encodeURIComponent(date)}`);
+}
+
+export async function loadLatestBloodPressureLog(): Promise<SimpleBloodPressureLog | null> {
+  return api<SimpleBloodPressureLog | null>("/api/bp/logs?latest=true");
+}
+
+export async function loadBloodPressurePeriodLogs(days: 7 | 15 | 30): Promise<SimpleBloodPressureLog[]> {
+  return api<SimpleBloodPressureLog[]>(`/api/bp/logs?days=${days}`);
+}
+
+export async function updateSimpleBloodPressureReading(input: {
+  id: string;
+  measuredAt: string;
+  measurementRound: SimpleBloodPressureLog["measurement_round"];
+  sys: number;
+  dia: number;
+  pulse: number;
+}) {
+  await api("/api/bp/action", {
+    method: "POST",
+    body: JSON.stringify({ action: "update_simple_log", input }),
+  });
+}
+
 export async function deleteBloodPressureReading(id: string) {
   await api("/api/bp/action", {
     method: "POST",
