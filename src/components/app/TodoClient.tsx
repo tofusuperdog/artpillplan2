@@ -240,16 +240,19 @@ function TaskEditor({ task, projects, selectedProject, onClose, onSaved }: {
 function ProjectEditor({ projects, onClose, onChanged }: { projects: TodoProject[]; onClose: () => void; onChanged: () => Promise<void> }) {
   const [name, setName] = useState("");
   const [color, setColor] = useState<TodoProjectColor>("amber");
+  const [editingProject, setEditingProject] = useState<TodoProject | null>(null);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const add = async () => {
+  const save = async () => {
     if (!name.trim()) return setMessage("Please enter a project name.");
     setWorking(true);
     setMessage(null);
     try {
-      await saveTodoProject({ name, color });
+      await saveTodoProject({ id: editingProject?.id, name, color });
       setName("");
+      setColor("amber");
+      setEditingProject(null);
       await onChanged();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Unable to create project.");
@@ -258,11 +261,26 @@ function ProjectEditor({ projects, onClose, onChanged }: { projects: TodoProject
     }
   };
 
+  const edit = (project: TodoProject) => {
+    setEditingProject(project);
+    setName(project.name);
+    setColor(project.color);
+    setMessage(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingProject(null);
+    setName("");
+    setColor("amber");
+    setMessage(null);
+  };
+
   const remove = async (project: TodoProject) => {
     if (!window.confirm(`Delete “${project.name}” and all of its tasks?`)) return;
     setWorking(true);
     try {
       await deleteTodoProject(project.id);
+      if (editingProject?.id === project.id) cancelEdit();
       await onChanged();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Unable to delete project.");
@@ -275,11 +293,14 @@ function ProjectEditor({ projects, onClose, onChanged }: { projects: TodoProject
     <section className="todo-modal todo-project-modal">
       <div className="todo-modal-title"><h1>Projects</h1><button className="icon-btn" onClick={onClose} aria-label="Close"><X /></button></div>
       <div className="todo-project-create">
-        <label><span>New project</span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Project name" /></label>
+        <label><span>{editingProject ? "Edit project" : "New project"}</span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Project name" /></label>
         <div className="todo-color-picker" aria-label="Project color">{projectColors.map((value) => <button key={value} className={`${value} ${color === value ? "active" : ""}`} onClick={() => setColor(value)} aria-label={value} />)}</div>
-        <button className="primary" disabled={working} onClick={add}><Plus /> Add project</button>
+        <div className="todo-project-form-actions">
+          {editingProject && <button className="secondary" disabled={working} onClick={cancelEdit}>Cancel</button>}
+          <button className="primary" disabled={working} onClick={save}>{editingProject ? <><Check /> Save changes</> : <><Plus /> Add project</>}</button>
+        </div>
       </div>
-      <div className="todo-project-manage-list">{projects.map((project) => <div key={project.id}><span><i className={`todo-project-dot ${project.color}`} />{project.name}</span><button onClick={() => remove(project)} disabled={working} aria-label={`Delete ${project.name}`}><Trash2 /></button></div>)}</div>
+      <div className="todo-project-manage-list">{projects.map((project) => <div key={project.id}><span><i className={`todo-project-dot ${project.color}`} />{project.name}</span><div className="todo-project-row-actions"><button onClick={() => edit(project)} disabled={working} aria-label={`Edit ${project.name}`}><Pencil /></button><button onClick={() => remove(project)} disabled={working} aria-label={`Delete ${project.name}`}><Trash2 /></button></div></div>)}</div>
       {message && <p className="todo-form-message">{message}</p>}
     </section>
   </div>;

@@ -1671,6 +1671,114 @@ h2 {
   min-height: 46px;
 }
 
+.bp-delete-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(42, 31, 21, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.bp-delete-confirm {
+  width: min(430px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 15px;
+  padding: 24px 20px 20px;
+  border: 1px solid #d1aa72;
+  border-radius: 18px;
+  background: #fff9ec;
+  box-shadow: 0 22px 54px rgba(37, 22, 10, 0.36);
+  text-align: center;
+}
+
+.bp-delete-confirm-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #a92e28;
+  background: #f6ddd6;
+}
+
+.bp-delete-confirm-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.bp-delete-confirm h1 {
+  margin: 0;
+  color: #2b2119;
+  font-size: 24px;
+  font-style: normal;
+  text-shadow: none;
+}
+
+.bp-delete-confirm p {
+  margin: 7px 0 0;
+  color: #756451;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.bp-delete-reading {
+  width: 100%;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #dfc391;
+  border-radius: 11px;
+  background: #fffdf7;
+  text-align: left;
+}
+
+.bp-delete-reading span {
+  color: #756451;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.bp-delete-reading strong {
+  color: #b32923;
+  font-size: 19px;
+}
+
+.bp-delete-confirm-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 8px;
+}
+
+.bp-delete-confirm-actions button {
+  min-height: 48px;
+}
+
+.bp-confirm-delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #8e241f;
+  border-radius: 10px;
+  color: #fffaf0;
+  background: #aa332d;
+  font-weight: 900;
+}
+
+.bp-confirm-delete-button:disabled {
+  opacity: 0.62;
+}
+
+.bp-confirm-delete-button svg {
+  width: 17px;
+}
+
 .bp-latest-summary {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -2705,6 +2813,25 @@ h2 {
   border: 0;
   color: #a52d28;
   background: transparent;
+}
+
+.todo-project-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.todo-project-form-actions button {
+  min-height: 44px;
+}
+
+.todo-project-row-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.todo-project-row-actions button:first-child {
+  color: #6c604e;
 }
 
 .todo-project-manage-list svg {

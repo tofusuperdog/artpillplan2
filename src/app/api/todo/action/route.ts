@@ -5,7 +5,7 @@ import type { TodoPriority, TodoProjectColor } from "@/lib/todoTypes";
 
 type SaveTaskInput = { id?: string; projectId: string; title: string; dueDate?: string | null; priority: TodoPriority };
 type ActionBody =
-  | { action: "save_project"; input: { name: string; color: TodoProjectColor } }
+  | { action: "save_project"; input: { id?: string; name: string; color: TodoProjectColor } }
   | { action: "delete_project"; input: { id: string } }
   | { action: "save_task"; input: SaveTaskInput }
   | { action: "toggle_task"; input: { id: string; completed: boolean } }
@@ -34,11 +34,15 @@ export async function POST(request: Request) {
   }
 }
 
-async function saveProject(input: { name: string; color: TodoProjectColor }) {
+async function saveProject(input: { id?: string; name: string; color: TodoProjectColor }) {
   const name = input.name?.trim();
   if (!name || name.length > 60) throw new Error("Project name must be 1-60 characters.");
   if (!COLORS.includes(input.color)) throw new Error("Project color is invalid.");
-  const { error } = await supabaseAdmin.from("todo_projects").insert({ name, color: input.color });
+  const payload = { name, color: input.color, updated_at: new Date().toISOString() };
+  const query = input.id
+    ? supabaseAdmin.from("todo_projects").update(payload).eq("id", input.id)
+    : supabaseAdmin.from("todo_projects").insert(payload);
+  const { error } = await query;
   if (error) throw new Error(error.message);
 }
 

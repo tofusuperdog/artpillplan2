@@ -16,7 +16,7 @@ export function loadTodoData() {
   return todoApi<TodoData>("/api/todo/data");
 }
 
-export function saveTodoProject(input: { name: string; color: TodoProjectColor }) {
+export function saveTodoProject(input: { id?: string; name: string; color: TodoProjectColor }) {
   return todoApi<{ ok: true }>("/api/todo/action", {
     method: "POST",
     body: JSON.stringify({ action: "save_project", input }),

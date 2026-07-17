@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  AlertTriangle,
   ArrowLeft,
   ClipboardPlus,
   Heart,
@@ -215,7 +216,13 @@ export default function BpClient({
         />}
 
         {view === "log" && (
-          <LogView initialMeasuredAt={form.measuredAt} />
+          <LogView
+            initialMeasuredAt={form.measuredAt}
+            onSaved={async () => {
+              await Promise.all([refreshRecentLogs(), refreshSummaryLogs()]);
+              router.replace("/bp");
+            }}
+          />
         )}
 
         {data && view === "report" && <ReportView data={data} onEdit={editLog} />}
@@ -380,6 +387,7 @@ function RecentLogModal({ log, onClose, onSaved }: { log: SimpleBloodPressureLog
   const [pulse, setPulse] = useState(String(log.pulse));
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const save = async () => {
     if (!sys || !dia || !pulse) return setMessage("Please enter SYS, DIA, and Pulse.");
@@ -396,7 +404,7 @@ function RecentLogModal({ log, onClose, onSaved }: { log: SimpleBloodPressureLog
   };
 
   const remove = async () => {
-    if (!window.confirm("Delete this reading?")) return;
+    setConfirmDelete(false);
     setWorking(true);
     setMessage(null);
     try {
@@ -409,18 +417,35 @@ function RecentLogModal({ log, onClose, onSaved }: { log: SimpleBloodPressureLog
     }
   };
 
-  return <div className="bp-list-modal-backdrop" role="dialog" aria-modal="true" aria-label="Edit blood pressure reading">
-    <section className="bp-list-modal bp-edit-modal">
-      <div className="bp-list-modal-header"><h1>Edit BP reading</h1><button className="icon-btn" onClick={onClose} aria-label="Close"><X /></button></div>
-      <label className="bp-simple-field"><span>Date & time</span><input type="datetime-local" value={measuredAt} onChange={(event) => setMeasuredAt(event.target.value)} /></label>
-      <label className="bp-simple-field"><span>Measurement round</span><select value={measurementRound} onChange={(event) => setMeasurementRound(event.target.value as SimpleBloodPressureLog["measurement_round"])}>{measurementRounds.map((round) => <option key={round.value} value={round.value}>{round.label}</option>)}</select></label>
-      <div className="bp-modal-values">
-        <label><span>SYS</span><input inputMode="numeric" value={sys} onChange={(event) => setSys(digitsOnly(event.target.value, 3))} /></label>
-        <label><span>DIA</span><input inputMode="numeric" value={dia} onChange={(event) => setDia(digitsOnly(event.target.value, 3))} /></label>
-        <label><span>Pulse</span><input inputMode="numeric" value={pulse} onChange={(event) => setPulse(digitsOnly(event.target.value, 3))} /></label>
+  return <>
+    <div className="bp-list-modal-backdrop" role="dialog" aria-modal="true" aria-label="Edit blood pressure reading">
+      <section className="bp-list-modal bp-edit-modal">
+        <div className="bp-list-modal-header"><h1>Edit BP reading</h1><button className="icon-btn" onClick={onClose} aria-label="Close"><X /></button></div>
+        <label className="bp-simple-field"><span>Date & time</span><input type="datetime-local" value={measuredAt} onChange={(event) => setMeasuredAt(event.target.value)} /></label>
+        <label className="bp-simple-field"><span>Measurement round</span><select value={measurementRound} onChange={(event) => setMeasurementRound(event.target.value as SimpleBloodPressureLog["measurement_round"])}>{measurementRounds.map((round) => <option key={round.value} value={round.value}>{round.label}</option>)}</select></label>
+        <div className="bp-modal-values">
+          <label><span>SYS</span><input inputMode="numeric" value={sys} onChange={(event) => setSys(digitsOnly(event.target.value, 3))} /></label>
+          <label><span>DIA</span><input inputMode="numeric" value={dia} onChange={(event) => setDia(digitsOnly(event.target.value, 3))} /></label>
+          <label><span>Pulse</span><input inputMode="numeric" value={pulse} onChange={(event) => setPulse(digitsOnly(event.target.value, 3))} /></label>
+        </div>
+        {message && <p className="bp-simple-status" role="status">{message}</p>}
+        <div className="bp-modal-actions"><button className="secondary" disabled={working} onClick={() => setConfirmDelete(true)}><Trash2 /> Delete</button><button className="primary" disabled={working} onClick={save}><Save /> Save</button></div>
+      </section>
+    </div>
+    {confirmDelete && <BpDeleteConfirm log={log} working={working} onCancel={() => setConfirmDelete(false)} onConfirm={remove} />}
+  </>;
+}
+
+function BpDeleteConfirm({ log, working, onCancel, onConfirm }: { log: SimpleBloodPressureLog; working: boolean; onCancel: () => void; onConfirm: () => void }) {
+  return <div className="bp-delete-confirm-backdrop" role="alertdialog" aria-modal="true" aria-labelledby="bp-delete-title" aria-describedby="bp-delete-description">
+    <section className="bp-delete-confirm">
+      <div className="bp-delete-confirm-icon"><AlertTriangle /></div>
+      <div><h1 id="bp-delete-title">Delete BP reading?</h1><p id="bp-delete-description">This reading will be permanently removed and the BP Summary will be recalculated.</p></div>
+      <div className="bp-delete-reading">
+        <span>{measurementRoundLabel(log.measurement_round)} · {formatReadingTime(log.measured_at)}</span>
+        <strong>{log.sys}/{log.dia} mmHg · {log.pulse} bpm</strong>
       </div>
-      {message && <p className="bp-simple-status" role="status">{message}</p>}
-      <div className="bp-modal-actions"><button className="secondary" disabled={working} onClick={remove}><Trash2 /> Delete</button><button className="primary" disabled={working} onClick={save}><Save /> Save</button></div>
+      <div className="bp-delete-confirm-actions"><button className="secondary" disabled={working} onClick={onCancel}>Cancel</button><button className="bp-confirm-delete-button" disabled={working} onClick={onConfirm}><Trash2 /> {working ? "Deleting..." : "Delete reading"}</button></div>
     </section>
   </div>;
 }
@@ -731,7 +756,7 @@ const measurementRounds = [
   { value: "bedtime", label: "Before bed" },
 ] as const;
 
-function LogView({ initialMeasuredAt }: { initialMeasuredAt: string }) {
+function LogView({ initialMeasuredAt, onSaved }: { initialMeasuredAt: string; onSaved: () => Promise<void> }) {
   const [measuredAt, setMeasuredAt] = useState(initialMeasuredAt);
   const [measurementRound, setMeasurementRound] = useState<typeof measurementRounds[number]["value"] | "">("");
   const [sys, setSys] = useState("");
@@ -755,10 +780,7 @@ function LogView({ initialMeasuredAt }: { initialMeasuredAt: string }) {
         dia: Number(dia),
         pulse: Number(pulse),
       });
-      setStatus("Reading saved.");
-      setSys("");
-      setDia("");
-      setPulse("");
+      await onSaved();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Unable to save this reading.");
     } finally {
