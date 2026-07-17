@@ -59,6 +59,7 @@ export default function TodoClient() {
   const today = dateInputToday();
   const openCount = data.tasks.filter((task) => !task.is_completed).length;
   const dueTodayCount = data.tasks.filter((task) => !task.is_completed && task.due_date === today).length;
+  const overdueCount = data.tasks.filter((task) => !task.is_completed && Boolean(task.due_date && task.due_date < today)).length;
 
   const toggle = async (task: TodoTask) => {
     setWorkingTaskId(task.id);
@@ -88,6 +89,10 @@ export default function TodoClient() {
           <div>
             <span>{dueTodayCount}</span>
             <small>Due today</small>
+          </div>
+          <div className={overdueCount > 0 ? "todo-overdue-stat" : ""}>
+            <span>{overdueCount}</span>
+            <small>Overdue</small>
           </div>
           <button className="primary" onClick={() => setTaskEditor("new")} disabled={data.projects.length === 0}><Plus /> New task</button>
         </section>

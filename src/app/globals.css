@@ -2297,7 +2297,7 @@ h2 {
 
 .todo-overview {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -2321,6 +2321,11 @@ h2 {
 .todo-overview small {
   color: var(--todo-muted);
   font-weight: 800;
+}
+
+.todo-overview .todo-overdue-stat span,
+.todo-overview .todo-overdue-stat small {
+  color: #ad3a33;
 }
 
 .todo-overview .primary {
@@ -3211,7 +3216,7 @@ h2 {
   }
 
   .todo-overview {
-    grid-template-columns: 130px 130px 1fr;
+    grid-template-columns: repeat(3, 120px) 1fr;
   }
 
   .todo-overview .primary {
