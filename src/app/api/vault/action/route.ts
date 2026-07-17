@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasSessionCookie } from "@/lib/serverAuth";
+import { getVaultSessionBaseCode, setVaultSessionCookie } from "@/lib/serverVaultAuth";
 import {
   bangkokDaySuffix,
   codeVerifierMatches,
@@ -15,8 +16,10 @@ import type { VaultEncryptedRow, VaultItem, VaultPayload } from "@/lib/vaultType
 type ActionBody =
   | { action: "setup"; input: { baseCode: string } }
   | { action: "unlock"; input: { unlockCode: string } }
-  | { action: "save_item"; input: VaultPayload & { id?: string; unlockCode: string } }
-  | { action: "delete_item"; input: { id: string; unlockCode: string } };
+  | { action: "list" }
+  | { action: "change_code"; input: { baseCode: string } }
+  | { action: "save_item"; input: VaultPayload & { id?: string } }
+  | { action: "delete_item"; input: { id: string } };
 
 type VaultSetting = {
   id: number;
@@ -42,15 +45,25 @@ export async function POST(request: Request) {
     if (body.action === "unlock") {
       const access = await verifyUnlockCode(body.input.unlockCode);
       const key = deriveVaultKey(access.baseCode, access.setting.code_salt);
+      await setVaultSessionCookie(access.baseCode);
       return NextResponse.json({ items: await readItems(key) });
     }
+    if (body.action === "list") {
+      const access = await getVaultAccess();
+      const key = deriveVaultKey(access.baseCode, access.setting.code_salt);
+      return NextResponse.json({ items: await readItems(key) });
+    }
+    if (body.action === "change_code") {
+      const items = await changeVaultCode(body.input.baseCode);
+      return NextResponse.json({ items });
+    }
     if (body.action === "save_item") {
-      const access = await verifyUnlockCode(body.input.unlockCode);
+      const access = await getVaultAccess();
       const key = deriveVaultKey(access.baseCode, access.setting.code_salt);
       await saveItem(body.input, key);
       return NextResponse.json({ items: await readItems(key) });
     }
-    const access = await verifyUnlockCode(body.input.unlockCode);
+    const access = await getVaultAccess();
     const key = deriveVaultKey(access.baseCode, access.setting.code_salt);
     await deleteItem(body.input.id);
     return NextResponse.json({ items: await readItems(key) });
@@ -58,6 +71,35 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Vault action failed.";
     return NextResponse.json({ message }, { status: message === "Vault is not set up." ? 409 : 400 });
   }
+}
+
+async function changeVaultCode(newBaseCode: string) {
+  validateBaseCode(newBaseCode);
+  const access = await getVaultAccess();
+  const oldKey = deriveVaultKey(access.baseCode, access.setting.code_salt);
+  const items = await readItems(oldKey);
+  const newSalt = createVaultSalt();
+  const encryptedItems = items.map((item) => ({
+    id: item.id,
+    ...encryptVaultPayload({ label: item.label, account: item.account, secret: item.secret, notes: item.notes }, deriveVaultKey(newBaseCode, newSalt)),
+  }));
+  const { error } = await supabaseAdmin.rpc("rotate_vault_code", {
+    p_code_salt: newSalt,
+    p_code_verifier: createCodeVerifier(newBaseCode, newSalt),
+    p_items: encryptedItems,
+  });
+  if (error) throw new Error(error.message);
+  await setVaultSessionCookie(newBaseCode);
+  return items;
+}
+
+async function getVaultAccess() {
+  const baseCode = await getVaultSessionBaseCode();
+  if (!baseCode) throw new Error("Vault is locked.");
+  const { data, error } = await supabaseAdmin.from("vault_settings").select("*").eq("id", 1).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Vault is not set up.");
+  return { baseCode, setting: data as VaultSetting };
 }
 
 async function setup(baseCode: string) {

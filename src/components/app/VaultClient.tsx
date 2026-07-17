@@ -1,41 +1,48 @@
 "use client";
 
-import { ArrowLeft, Copy, Eye, EyeOff, KeyRound, LockKeyhole, Pencil, Plus, ShieldCheck, Trash2, Vault, X } from "lucide-react";
+import { ArrowLeft, Copy, Eye, EyeOff, KeyRound, LockKeyhole, Pencil, Plus, Settings, ShieldCheck, Trash2, Vault, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { deleteVaultItem, loadVaultStatus, saveVaultItem, setupVault, unlockVault } from "@/lib/vaultData";
+import { useEffect, useRef, useState } from "react";
+import { changeVaultCode, deleteVaultItem, loadVaultItems, loadVaultStatus, lockVault, refreshVaultSession, saveVaultItem, setupVault, unlockVault } from "@/lib/vaultData";
 import type { VaultItem } from "@/lib/vaultTypes";
 
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 
-export default function VaultClient() {
+export default function VaultClient({ content = false }: { content?: boolean }) {
   const router = useRouter();
   const [initialized, setInitialized] = useState<boolean | null>(null);
-  const [unlockCode, setUnlockCode] = useState("");
   const [items, setItems] = useState<VaultItem[]>([]);
   const [editor, setEditor] = useState<VaultItem | "new" | null>(null);
+  const [changingCode, setChangingCode] = useState(false);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
+  const lastSessionRefresh = useRef(0);
 
   useEffect(() => {
+    if (content) {
+      loadVaultItems()
+        .then((result) => setItems(result.items))
+        .catch(() => router.replace("/vault"));
+      return;
+    }
     loadVaultStatus()
       .then((status) => setInitialized(status.initialized))
       .catch((error) => setMessage(error instanceof Error ? error.message : "Unable to load vault."));
-  }, []);
+  }, [content, router]);
 
   useEffect(() => {
-    if (!unlockCode) return;
+    if (!content) return;
     let timer: number;
     const lock = () => {
-      setUnlockCode("");
-      setItems([]);
-      setEditor(null);
-      setRevealed(new Set());
-      setMessage("Vault locked after 5 minutes of inactivity.");
+      void lockVault().finally(() => router.replace("/vault"));
     };
     const reset = () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(lock, AUTO_LOCK_MS);
+      if (Date.now() - lastSessionRefresh.current >= 30_000) {
+        lastSessionRefresh.current = Date.now();
+        void refreshVaultSession().catch(() => router.replace("/vault"));
+      }
     };
     reset();
     window.addEventListener("pointerdown", reset);
@@ -45,14 +52,11 @@ export default function VaultClient() {
       window.removeEventListener("pointerdown", reset);
       window.removeEventListener("keydown", reset);
     };
-  }, [unlockCode]);
+  }, [router]);
 
-  const lock = () => {
-    setUnlockCode("");
-    setItems([]);
-    setEditor(null);
-    setRevealed(new Set());
-    setMessage(null);
+  const lock = async () => {
+    await lockVault().catch(() => undefined);
+    router.replace("/vault");
   };
 
   const copy = async (value: string, label: string) => {
@@ -67,14 +71,14 @@ export default function VaultClient() {
         <header className="top-header vault-header">
           <button className="icon-btn" onClick={() => router.push("/home")} aria-label="Back"><ArrowLeft /></button>
           <div className="wordmark">Vault</div>
-          {unlockCode && <button className="vault-lock-button" onClick={lock}><LockKeyhole /> Lock</button>}
+          {content && <div className="vault-header-actions"><button className="vault-code-settings-button" onClick={() => setChangingCode(true)} aria-label="Change vault code"><Settings /></button><button className="vault-lock-button" onClick={() => void lock()}><LockKeyhole /> Lock</button></div>}
         </header>
 
-        {initialized === null && !message && <VaultLoading />}
-        {initialized === null && message && <section className="vault-gate"><div className="vault-door-icon"><Vault /></div><h1>Unable to open vault</h1><p className="vault-message">{message}</p><button className="secondary" onClick={() => window.location.reload()}>Retry</button></section>}
-        {initialized === false && <VaultSetup onReady={() => { setInitialized(true); setMessage("Vault is ready. Unlock it with your 9-digit daily code."); }} />}
-        {initialized === true && !unlockCode && <VaultUnlock message={message} onUnlocked={(code, nextItems) => { setUnlockCode(code); setItems(nextItems); setMessage(null); }} />}
-        {initialized === true && unlockCode && (
+        {!content && initialized === null && !message && <VaultLoading />}
+        {!content && initialized === null && message && <section className="vault-gate"><div className="vault-door-icon"><Vault /></div><h1>Unable to open vault</h1><p className="vault-message">{message}</p><button className="secondary" onClick={() => window.location.reload()}>Retry</button></section>}
+        {!content && initialized === false && <VaultSetup onReady={() => { setInitialized(true); setMessage("Vault is ready. Unlock it with your 9-digit daily code."); }} />}
+        {!content && initialized === true && <VaultUnlock message={message} onUnlocked={() => router.replace("/vault/content")} />}
+        {content && (
           <VaultContents
             items={items}
             revealed={revealed}
@@ -89,16 +93,20 @@ export default function VaultClient() {
           />
         )}
 
-        {unlockCode && editor && (
+        {content && editor && (
           <VaultItemEditor
             item={editor === "new" ? null : editor}
-            unlockCode={unlockCode}
             onClose={() => setEditor(null)}
             onChanged={(nextItems) => { setItems(nextItems); setEditor(null); setRevealed(new Set()); }}
           />
         )}
 
-        {unlockCode && message && <div className="toast">{message}</div>}
+        {content && changingCode && <VaultCodeChange
+          onClose={() => setChangingCode(false)}
+          onChanged={(nextItems) => { setItems(nextItems); setChangingCode(false); setRevealed(new Set()); setMessage("Vault code changed."); }}
+        />}
+
+        {content && message && <div className="toast">{message}</div>}
       </div>
     </main>
   );
@@ -145,21 +153,30 @@ function VaultSetup({ onReady }: { onReady: () => void }) {
   </section>;
 }
 
-function VaultUnlock({ message: initialMessage, onUnlocked }: { message: string | null; onUnlocked: (code: string, items: VaultItem[]) => void }) {
+function VaultUnlock({ message: initialMessage, onUnlocked }: { message: string | null; onUnlocked: () => void }) {
   const [code, setCode] = useState("");
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(initialMessage);
 
   const submit = async () => {
-    if (!/^\d{9}$/.test(code)) return setMessage("Enter your 7-digit code followed by today's 2-digit day.");
+    if (!/^\d{9}$/.test(code)) {
+      setCode("");
+      return setMessage("Invalid vault code.");
+    }
     setWorking(true);
     setMessage(null);
     try {
-      const result = await unlockVault(code);
-      onUnlocked(code, result.items);
+      await unlockVault(code);
+      onUnlocked();
       setCode("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to unlock vault.");
+      const nextMessage = error instanceof Error ? error.message : "Unable to unlock vault.";
+      if (nextMessage === "Incorrect vault code.") {
+        setCode("");
+        setMessage("Invalid vault code.");
+      } else {
+        setMessage(nextMessage);
+      }
     } finally {
       setWorking(false);
     }
@@ -167,15 +184,86 @@ function VaultUnlock({ message: initialMessage, onUnlocked }: { message: string 
 
   return <section className="vault-gate">
     <div className="vault-door-icon"><Vault /></div>
-    <span className="vault-eyebrow">Encrypted storage</span>
     <h1>Unlock your vault</h1>
-    <p>Enter 9 digits: your private 7-digit code followed by today's day.</p>
-    <div className="vault-code-example"><span>7-digit code</span><i>+</i><strong>{daySuffix()}</strong></div>
-    <label className="vault-code-field"><span>Daily vault code</span><input type="password" inputMode="numeric" autoComplete="off" maxLength={9} value={code} onChange={(event) => setCode(digits(event.target.value, 9))} autoFocus onKeyDown={(event) => { if (event.key === "Enter") void submit(); }} /></label>
+    <div className="vault-current-date"><span>Today - Thailand</span><strong>{currentThailandDate()}</strong></div>
+    <VaultCodeInput value={code} onChange={(value) => { setCode(value); if (message) setMessage(null); }} onSubmit={submit} />
     {message && <p className="vault-message">{message}</p>}
     <button className="primary wide" disabled={working} onClick={submit}><KeyRound /> {working ? "Unlocking..." : "Unlock vault"}</button>
     <small>Five incorrect attempts lock the vault for 15 minutes.</small>
   </section>;
+}
+
+function VaultCodeInput({ value, onChange, onSubmit }: { value: string; onChange: (value: string) => void; onSubmit: () => void }) {
+  const inputs = useRef<Array<HTMLInputElement | null>>([]);
+  const [visible, setVisible] = useState(false);
+
+  const updateDigit = (index: number, rawValue: string) => {
+    const entered = digits(rawValue, 9);
+    if (!entered) {
+      if (value[index]) onChange(value.slice(0, index) + value.slice(index + 1));
+      return;
+    }
+
+    if (entered.length > 1) {
+      const nextValue = digits(value.slice(0, index) + entered, 9);
+      onChange(nextValue);
+      inputs.current[Math.min(nextValue.length, 8)]?.focus();
+      return;
+    }
+
+    const nextDigits = value.split("");
+    nextDigits[index] = entered;
+    const nextValue = nextDigits.filter(Boolean).join("").slice(0, 9);
+    onChange(nextValue);
+    if (index < 8) inputs.current[index + 1]?.focus();
+  };
+
+  return <div className="vault-pin-field">
+    <div className="vault-pin-heading">
+      <span>Daily vault code</span>
+      <button type="button" onClick={() => setVisible((current) => !current)} aria-label={visible ? "Hide vault code" : "Show vault code"}>
+        {visible ? <EyeOff /> : <Eye />}
+      </button>
+    </div>
+    <div className="vault-pin-inputs" onPaste={(event) => {
+      event.preventDefault();
+      const pasted = digits(event.clipboardData.getData("text"), 9);
+      if (!pasted) return;
+      onChange(pasted);
+      inputs.current[Math.min(pasted.length, 8)]?.focus();
+    }}>
+      {Array.from({ length: 9 }, (_, index) => <input
+        key={index}
+        ref={(element) => { inputs.current[index] = element; }}
+        type={visible ? "text" : "password"}
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete={index === 0 ? "one-time-code" : "off"}
+        maxLength={1}
+        value={value[index] || ""}
+        className={value[index] ? "is-filled" : ""}
+        aria-label={`Vault code digit ${index + 1}`}
+        autoFocus={index === 0}
+        onFocus={(event) => event.currentTarget.select()}
+        onChange={(event) => updateDigit(index, event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") return void onSubmit();
+          if (event.key === "ArrowLeft" && index > 0) return void inputs.current[index - 1]?.focus();
+          if (event.key === "ArrowRight" && index < 8) return void inputs.current[index + 1]?.focus();
+          if (event.key === "Backspace") {
+            event.preventDefault();
+            if (value[index]) onChange(value.slice(0, index) + value.slice(index + 1));
+            else if (index > 0) {
+              onChange(value.slice(0, index - 1) + value.slice(index));
+              inputs.current[index - 1]?.focus();
+            }
+            return;
+          }
+          if (!event.ctrlKey && !event.metaKey && event.key.length === 1 && !/^\d$/.test(event.key)) event.preventDefault();
+        }}
+      />)}
+    </div>
+  </div>;
 }
 
 function VaultContents({ items, revealed, onReveal, onCopy, onEdit, onAdd }: {
@@ -199,7 +287,40 @@ function VaultContents({ items, revealed, onReveal, onCopy, onEdit, onAdd }: {
   </>;
 }
 
-function VaultItemEditor({ item, unlockCode, onClose, onChanged }: { item: VaultItem | null; unlockCode: string; onClose: () => void; onChanged: (items: VaultItem[]) => void }) {
+function VaultCodeChange({ onClose, onChanged }: { onClose: () => void; onChanged: (items: VaultItem[]) => void }) {
+  const [code, setCode] = useState("");
+  const [confirmCode, setConfirmCode] = useState("");
+  const [working, setWorking] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!/^\d{7}$/.test(code)) return setMessage("Enter exactly 7 digits.");
+    if (code !== confirmCode) return setMessage("The codes do not match.");
+    setWorking(true);
+    setMessage(null);
+    try {
+      const result = await changeVaultCode(code);
+      onChanged(result.items);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to change vault code.");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return <div className="vault-modal-backdrop" role="dialog" aria-modal="true" aria-label="Change vault code">
+    <section className="vault-modal">
+      <div className="vault-modal-title"><h1>Change vault code</h1><button onClick={onClose} aria-label="Close"><X /></button></div>
+      <p className="vault-code-change-note">Your saved secrets will be re-encrypted with this new 7-digit code.</p>
+      <label><span>New 7-digit code</span><input type="password" inputMode="numeric" autoComplete="new-password" maxLength={7} value={code} onChange={(event) => setCode(digits(event.target.value, 7))} autoFocus /></label>
+      <label><span>Confirm new code</span><input type="password" inputMode="numeric" autoComplete="new-password" maxLength={7} value={confirmCode} onChange={(event) => setConfirmCode(digits(event.target.value, 7))} onKeyDown={(event) => { if (event.key === "Enter") void submit(); }} /></label>
+      {message && <p className="vault-message">{message}</p>}
+      <div className="vault-modal-actions"><button className="secondary" disabled={working} onClick={onClose}>Cancel</button><button className="primary" disabled={working} onClick={submit}>{working ? "Changing..." : "Change code"}</button></div>
+    </section>
+  </div>;
+}
+
+function VaultItemEditor({ item, onClose, onChanged }: { item: VaultItem | null; onClose: () => void; onChanged: (items: VaultItem[]) => void }) {
   const [label, setLabel] = useState(item?.label || "");
   const [account, setAccount] = useState(item?.account || "");
   const [secret, setSecret] = useState(item?.secret || "");
@@ -213,7 +334,7 @@ function VaultItemEditor({ item, unlockCode, onClose, onChanged }: { item: Vault
     setWorking(true);
     setMessage(null);
     try {
-      const result = await saveVaultItem(unlockCode, { id: item?.id, label, account, secret, notes });
+      const result = await saveVaultItem({ id: item?.id, label, account, secret, notes });
       onChanged(result.items);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save secret.");
@@ -226,7 +347,7 @@ function VaultItemEditor({ item, unlockCode, onClose, onChanged }: { item: Vault
     if (!item || !window.confirm("Delete this secret permanently?")) return;
     setWorking(true);
     try {
-      const result = await deleteVaultItem(unlockCode, item.id);
+      const result = await deleteVaultItem(item.id);
       onChanged(result.items);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to delete secret.");
@@ -254,4 +375,13 @@ function digits(value: string, length: number) {
 function daySuffix() {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Bangkok", day: "2-digit" }).formatToParts(new Date());
   return parts.find((part) => part.type === "day")?.value || "";
+}
+
+function currentThailandDate() {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Bangkok",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
 }

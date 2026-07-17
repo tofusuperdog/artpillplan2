@@ -130,7 +130,6 @@ export default function HomeClient({
             </div>
             <div className="module-status">
               <span><strong>Protection</strong>AES-256 encrypted</span>
-              <span><strong>Access</strong>Daily vault code</span>
             </div>
             <div className="module-action"><Vault /> Open vault</div>
           </button>

@@ -2859,6 +2859,28 @@ h2 {
   font-size: clamp(27px, 7vw, 35px);
 }
 
+.vault-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vault-code-settings-button {
+  width: 42px;
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #bda879;
+  border-radius: 10px;
+  color: #5f5748;
+  background: #fff9e9;
+}
+
+.vault-code-settings-button svg {
+  width: 18px;
+}
+
 .vault-lock-button {
   min-height: 42px;
   display: inline-flex;
@@ -2956,6 +2978,30 @@ h2 {
   font-size: 15px;
 }
 
+.vault-current-date {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 11px 14px;
+  border: 1px solid #ded2b9;
+  border-radius: 11px;
+  color: var(--vault-muted);
+  background: rgba(242, 234, 216, 0.62);
+}
+
+.vault-current-date span {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vault-current-date strong {
+  color: var(--vault-ink);
+  font-size: 16px;
+}
+
 .vault-code-field {
   width: 100%;
   display: grid;
@@ -2978,6 +3024,71 @@ h2 {
   font-weight: 900;
   letter-spacing: 0.24em;
   text-align: center;
+}
+
+.vault-pin-field {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.vault-pin-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #665e50;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.vault-pin-heading button {
+  width: 34px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d7c8aa;
+  border-radius: 8px;
+  color: var(--vault-green);
+  background: #fffef9;
+}
+
+.vault-pin-heading button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.vault-pin-inputs {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.vault-pin-inputs input {
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  padding: 0;
+  border: 1px solid #cdbb94;
+  border-radius: 9px;
+  color: var(--vault-ink);
+  background: #fffef9;
+  font-family: "Courier New", monospace;
+  font-size: 20px;
+  font-weight: 900;
+  text-align: center;
+  caret-color: var(--vault-green);
+}
+
+.vault-pin-inputs input:focus {
+  border-color: var(--vault-green);
+  outline: 3px solid rgba(51, 103, 76, 0.14);
+}
+
+.vault-pin-inputs input.is-filled {
+  border-color: #9eb6a7;
+  background: #f1f7f2;
 }
 
 .vault-warning {
@@ -3032,6 +3143,22 @@ h2 {
 
 .vault-content-heading .primary {
   min-height: 44px;
+}
+
+.vault-content-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.vault-content-actions button {
+  min-height: 44px;
+}
+
+.vault-code-change-note {
+  margin: 0;
+  color: #536057;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .vault-item-list {

@@ -30,16 +30,38 @@ export function unlockVault(unlockCode: string) {
   });
 }
 
-export function saveVaultItem(unlockCode: string, input: VaultPayload & { id?: string }) {
+export function loadVaultItems() {
   return vaultApi<{ items: VaultItem[] }>("/api/vault/action", {
     method: "POST",
-    body: JSON.stringify({ action: "save_item", input: { unlockCode, ...input } }),
+    body: JSON.stringify({ action: "list" }),
   });
 }
 
-export function deleteVaultItem(unlockCode: string, id: string) {
+export function lockVault() {
+  return vaultApi<{ ok: true }>("/api/vault/lock", { method: "POST" });
+}
+
+export function refreshVaultSession() {
+  return vaultApi<{ ok: true }>("/api/vault/refresh", { method: "POST" });
+}
+
+export function changeVaultCode(baseCode: string) {
   return vaultApi<{ items: VaultItem[] }>("/api/vault/action", {
     method: "POST",
-    body: JSON.stringify({ action: "delete_item", input: { unlockCode, id } }),
+    body: JSON.stringify({ action: "change_code", input: { baseCode } }),
+  });
+}
+
+export function saveVaultItem(input: VaultPayload & { id?: string }) {
+  return vaultApi<{ items: VaultItem[] }>("/api/vault/action", {
+    method: "POST",
+    body: JSON.stringify({ action: "save_item", input }),
+  });
+}
+
+export function deleteVaultItem(id: string) {
+  return vaultApi<{ items: VaultItem[] }>("/api/vault/action", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete_item", input: { id } }),
   });
 }
