@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 }
 
 async function saveSimpleLog(input: SaveSimpleLogInput) {
-  const measuredAt = new Date(input.measuredAt);
+  const measuredAt = bangkokLocalDateTime(input.measuredAt);
   if (Number.isNaN(measuredAt.getTime())) throw new Error("Measured time is invalid.");
   const rounds: MeasurementRound[] = ["morning_before_medication", "morning_after_medication", "noon", "evening_before_medication", "evening_after_medication", "bedtime"];
   if (!rounds.includes(input.measurementRound)) throw new Error("Measurement round is invalid.");
@@ -74,7 +74,7 @@ async function saveSimpleLog(input: SaveSimpleLogInput) {
 
 async function updateSimpleLog(input: SaveSimpleLogInput & { id: string }) {
   if (!input.id) throw new Error("Record is required.");
-  const measuredAt = new Date(input.measuredAt);
+  const measuredAt = bangkokLocalDateTime(input.measuredAt);
   if (Number.isNaN(measuredAt.getTime())) throw new Error("Measured time is invalid.");
   const rounds: MeasurementRound[] = ["morning_before_medication", "morning_after_medication", "noon", "evening_before_medication", "evening_after_medication", "bedtime"];
   if (!rounds.includes(input.measurementRound)) throw new Error("Measurement round is invalid.");
@@ -89,6 +89,16 @@ async function updateSimpleLog(input: SaveSimpleLogInput & { id: string }) {
     updated_at: new Date().toISOString(),
   }).eq("id", input.id);
   if (error) throw new Error(error.message);
+}
+
+// `datetime-local` values do not include an offset. Daily BP readings are
+// entered as Thailand local time, so never let the server's own timezone
+// decide how to interpret them.
+function bangkokLocalDateTime(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/.test(value)) {
+    return new Date(Number.NaN);
+  }
+  return new Date(`${value}+07:00`);
 }
 
 async function saveLog(input: SaveLogInput) {
