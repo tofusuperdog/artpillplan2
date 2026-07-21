@@ -67,11 +67,11 @@ export default function VaultClient({ content = false }: { content?: boolean }) 
 
   return (
     <main className="launcher-page-shell vault-page-shell">
-      <div className="launcher-app vault-app">
+      <div className={`launcher-app vault-app ${content ? "vault-content-app" : ""}`}>
         <header className="top-header vault-header">
           <button className="icon-btn" onClick={() => router.push("/home")} aria-label="Back"><ArrowLeft /></button>
           <div className="wordmark">Vault</div>
-          {content && <div className="vault-header-actions"><button className="vault-code-settings-button" onClick={() => setChangingCode(true)} aria-label="Change vault code"><Settings /></button><button className="vault-lock-button" onClick={() => void lock()}><LockKeyhole /> Lock</button></div>}
+          {content && <div className="header-actions"><button className="icon-btn" onClick={() => setChangingCode(true)} aria-label="Change vault code"><Settings /></button><button className="icon-btn" onClick={() => void lock()} aria-label="Lock vault"><LockKeyhole /></button></div>}
         </header>
 
         {!content && initialized === null && !message && <VaultLoading />}

@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, Check, FolderPlus, ListTodo, Pencil, Plus, Tra
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
+  deleteCompletedTodoTasks,
   deleteTodoProject,
   deleteTodoTask,
   loadTodoData,
@@ -26,6 +27,9 @@ export default function TodoClient() {
   const [taskEditor, setTaskEditor] = useState<TodoTask | "new" | null>(null);
   const [projectEditorOpen, setProjectEditorOpen] = useState(false);
   const [workingTaskId, setWorkingTaskId] = useState<string | null>(null);
+  const [clearingCompleted, setClearingCompleted] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
 
   const refresh = async () => {
     try {
@@ -60,6 +64,7 @@ export default function TodoClient() {
   const openCount = data.tasks.filter((task) => !task.is_completed).length;
   const dueTodayCount = data.tasks.filter((task) => !task.is_completed && task.due_date === today).length;
   const overdueCount = data.tasks.filter((task) => !task.is_completed && Boolean(task.due_date && task.due_date < today)).length;
+  const completedCount = data.tasks.filter((task) => task.is_completed).length;
 
   const toggle = async (task: TodoTask) => {
     setWorkingTaskId(task.id);
@@ -70,6 +75,21 @@ export default function TodoClient() {
       setError(err instanceof Error ? err.message : "Unable to update task.");
     } finally {
       setWorkingTaskId(null);
+    }
+  };
+
+  const clearCompleted = async () => {
+    if (completedCount === 0) return;
+    setClearingCompleted(true);
+    setClearError(null);
+    try {
+      await deleteCompletedTodoTasks();
+      await refresh();
+      setClearConfirmOpen(false);
+    } catch (err) {
+      setClearError(err instanceof Error ? err.message : "Unable to delete completed tasks.");
+    } finally {
+      setClearingCompleted(false);
     }
   };
 
@@ -94,7 +114,12 @@ export default function TodoClient() {
             <span>{overdueCount}</span>
             <small>Overdue</small>
           </div>
-          <button className="primary" onClick={() => setTaskEditor("new")} disabled={data.projects.length === 0}><Plus /> New task</button>
+          <div className="todo-overview-actions">
+            <button className="primary" onClick={() => setTaskEditor("new")} disabled={data.projects.length === 0}><Plus /> New task</button>
+            <button className="secondary todo-clear-completed" onClick={() => { setClearError(null); setClearConfirmOpen(true); }} disabled={completedCount === 0 || clearingCompleted}>
+              <Trash2 /> Clear completed ({completedCount})
+            </button>
+          </div>
         </section>
 
         <div className="todo-project-bar">
@@ -150,9 +175,40 @@ export default function TodoClient() {
             }}
           />
         )}
+
+        {clearConfirmOpen && (
+          <ClearCompletedConfirm
+            count={completedCount}
+            working={clearingCompleted}
+            message={clearError}
+            onCancel={() => { setClearConfirmOpen(false); setClearError(null); }}
+            onConfirm={clearCompleted}
+          />
+        )}
       </div>
     </main>
   );
+}
+
+function ClearCompletedConfirm({ count, working, message, onCancel, onConfirm }: {
+  count: number;
+  working: boolean;
+  message: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return <div className="todo-modal-backdrop" role="alertdialog" aria-modal="true" aria-labelledby="clear-completed-title" aria-describedby="clear-completed-description">
+    <section className="todo-modal todo-confirm-modal">
+      <div className="todo-confirm-icon" aria-hidden="true"><Trash2 /></div>
+      <h1 id="clear-completed-title">Clear completed tasks?</h1>
+      <p id="clear-completed-description">This will permanently delete {count} completed task{count === 1 ? "" : "s"}. This action cannot be undone.</p>
+      {message && <p className="todo-form-message">{message}</p>}
+      <div className="todo-confirm-actions">
+        <button className="secondary" disabled={working} onClick={onCancel}>Cancel</button>
+        <button className="danger-action" disabled={working || count === 0} onClick={onConfirm}><Trash2 /> {working ? "Deleting..." : "Delete tasks"}</button>
+      </div>
+    </section>
+  </div>;
 }
 
 function TaskRow({ task, project, working, onToggle, onEdit }: {

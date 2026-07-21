@@ -50,3 +50,10 @@ export function deleteTodoTask(id: string) {
     body: JSON.stringify({ action: "delete_task", input: { id } }),
   });
 }
+
+export function deleteCompletedTodoTasks() {
+  return todoApi<{ ok: true }>("/api/todo/action", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete_completed", input: {} }),
+  });
+}

@@ -187,7 +187,7 @@ export default function BpClient({
 
   return (
     <main className="launcher-page-shell bp-page-shell">
-      <div className="launcher-app bp-app">
+      <div className={`launcher-app bp-app ${view === "dashboard" ? "bp-dashboard-app" : ""}`}>
         <header className="top-header bp-header">
           <button className="icon-btn" onClick={() => router.push(view === "log" ? "/bp" : "/home")} aria-label="Back"><ArrowLeft /></button>
           <div className="wordmark">Blood Pressure</div>

@@ -2394,6 +2394,15 @@ h2 {
   padding-bottom: 40px;
 }
 
+@media (max-width: 699px) {
+  .todo-app,
+  .bp-dashboard-app,
+  .vault-content-app {
+    height: 100svh;
+    min-height: 0;
+  }
+}
+
 .todo-header {
   grid-template-columns: auto 1fr;
   margin-bottom: 16px;
@@ -2410,7 +2419,7 @@ h2 {
   margin-bottom: 14px;
 }
 
-.todo-overview > div {
+.todo-overview > div:not(.todo-overview-actions) {
   display: grid;
   gap: 2px;
   padding: 11px 13px;
@@ -2436,9 +2445,19 @@ h2 {
   color: #ad3a33;
 }
 
-.todo-overview .primary {
+.todo-overview-actions {
   grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.todo-overview-actions button {
   min-height: 48px;
+}
+
+.todo-clear-completed {
+  color: #a52d28;
 }
 
 .todo-project-bar {
@@ -2662,6 +2681,59 @@ h2 {
   box-shadow: 0 18px 45px rgba(39, 25, 10, 0.28);
 }
 
+.todo-confirm-modal {
+  max-width: 430px;
+  justify-items: center;
+  gap: 12px;
+  padding: 28px 22px 22px;
+  text-align: center;
+}
+
+.todo-confirm-icon {
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #d6a39b;
+  border-radius: 50%;
+  color: #a52d28;
+  background: #f8e3dc;
+  box-shadow: inset 0 0 0 5px #fff8ec;
+}
+
+.todo-confirm-icon svg {
+  width: 27px;
+  height: 27px;
+}
+
+.todo-confirm-modal h1 {
+  margin: 2px 0 0;
+  color: var(--todo-ink);
+  font-size: 25px;
+  font-style: normal;
+  text-shadow: none;
+}
+
+.todo-confirm-modal > p {
+  max-width: 340px;
+  margin: 0;
+  color: var(--todo-muted);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.todo-confirm-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.todo-confirm-actions button {
+  min-height: 48px;
+}
+
 .todo-modal-title {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -2857,45 +2929,6 @@ h2 {
 
 .vault-header .wordmark {
   font-size: clamp(27px, 7vw, 35px);
-}
-
-.vault-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.vault-code-settings-button {
-  width: 42px;
-  min-height: 42px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid #bda879;
-  border-radius: 10px;
-  color: #5f5748;
-  background: #fff9e9;
-}
-
-.vault-code-settings-button svg {
-  width: 18px;
-}
-
-.vault-lock-button {
-  min-height: 42px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid #bda879;
-  border-radius: 10px;
-  color: #5f5748;
-  background: #fff9e9;
-  font-weight: 900;
-}
-
-.vault-lock-button svg {
-  width: 17px;
 }
 
 .vault-gate {
@@ -3473,10 +3506,8 @@ h2 {
     grid-template-columns: repeat(3, 120px) 1fr;
   }
 
-  .todo-overview .primary {
+  .todo-overview-actions {
     grid-column: auto;
-    justify-self: end;
-    min-width: 160px;
   }
 
   .todo-modal-backdrop {

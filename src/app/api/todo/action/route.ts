@@ -9,7 +9,8 @@ type ActionBody =
   | { action: "delete_project"; input: { id: string } }
   | { action: "save_task"; input: SaveTaskInput }
   | { action: "toggle_task"; input: { id: string; completed: boolean } }
-  | { action: "delete_task"; input: { id: string } };
+  | { action: "delete_task"; input: { id: string } }
+  | { action: "delete_completed"; input: Record<string, never> };
 
 const COLORS: TodoProjectColor[] = ["amber", "red", "green", "blue", "purple"];
 const PRIORITIES: TodoPriority[] = ["low", "medium", "high"];
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
     if (body.action === "save_task") await saveTask(body.input);
     if (body.action === "toggle_task") await toggleTask(body.input.id, body.input.completed);
     if (body.action === "delete_task") await deleteRow("todo_tasks", body.input.id);
+    if (body.action === "delete_completed") await deleteCompletedTasks();
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : "Action failed." }, { status: 500 });
@@ -80,5 +82,10 @@ async function toggleTask(id: string, completed: boolean) {
 async function deleteRow(table: "todo_projects" | "todo_tasks", id: string) {
   if (!id) throw new Error("Record is required.");
   const { error } = await supabaseAdmin.from(table).delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+async function deleteCompletedTasks() {
+  const { error } = await supabaseAdmin.from("todo_tasks").delete().eq("is_completed", true);
   if (error) throw new Error(error.message);
 }
